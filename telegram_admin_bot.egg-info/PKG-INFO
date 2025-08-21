@@ -1,0 +1,54 @@
+Metadata-Version: 2.4
+Name: telegram-admin-bot
+Version: 0.1.0
+Summary: Production-grade, extensible Telegram group-management bot (async, PTB v22, SQLite)
+Author: Contributors
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: python-telegram-bot[callback-data,job-queue,rate-limiter]<23,>=22
+Requires-Dist: SQLAlchemy<3,>=2
+Requires-Dist: aiosqlite>=0.19
+Requires-Dist: python-dotenv>=1.0
+Requires-Dist: pydantic<2,>=1.10
+Provides-Extra: dev
+Requires-Dist: ruff>=0.4; extra == "dev"
+Requires-Dist: black>=24.1; extra == "dev"
+Requires-Dist: mypy>=1.7; extra == "dev"
+
+# Telegram Admin Bot (async, PTB v22, SQLite)
+
+A modular, extensible group-management bot built with python-telegram-bot v22 (async) and SQLite via SQLAlchemy 2.0 (aiosqlite). Supports English and Arabic.
+
+## Quick Start
+- Python 3.11+
+- Create venv and install:
+  - `python -m venv .venv && source .venv/bin/activate`
+  - `pip install -U pip && pip install -e .[dev]`
+- Configure environment:
+  - `cp .env.example .env` and set `BOT_TOKEN`, `OWNER_IDS`, `DATABASE_URL`, `DEFAULT_LANG`
+- Initialize DB:
+  - `python -m bot.infra.migrate`
+- Run bot (polling):
+  - `python -m bot.main`
+
+## Structure
+- `bot/core/` config, logging, permissions, i18n (`t()`)
+- `bot/infra/` db engine, models, migration, repositories
+- `bot/features/` moderation, welcome, antispam, rules, automations, admin_panel, onboarding
+- `bot/locales/` English and Arabic translations (packaged)
+
+## Commands
+- Public: `/start`, `/help`, `/rules`
+- Admin (groups): `/settings`, `/setrules <text>`, `/joinapprove on|off`
+- Moderation: `/warn`, `/mute <dur>`, `/unmute`, `/ban <dur>`, `/unban`, `/unwarn`, `/purge <N>`
+- Content rules: `/addrule <word|regex> <delete|warn|mute|ban> <pattern>`, `/listrules`, `/delrule <id>` (use DM panel to add reply rules and manage links policy)
+
+## Admin Panel (DM)
+- `/panel` in private → select group → tabs:
+  - Anti‑Spam: view current settings and apply presets.
+  - Rules: list/delete/add content rules, edit rules text.
+  - Welcome: toggle and edit welcome template.
+  - Language: set per‑group language (EN/AR).
+  - Onboarding: toggle auto‑approve and “require accept rules before join”.
+
+Notes: No Docker/CI/tests included by design. Use `ruff`, `black`, `mypy` locally.

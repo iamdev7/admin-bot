@@ -1,0 +1,106 @@
+from __future__ import annotations
+
+from telegram import ChatMemberUpdated, Update
+from telegram.constants import ChatMemberStatus
+from telegram.ext import Application, ChatMemberHandler, ContextTypes
+
+from .i18n import I18N
+from ..infra import db
+from ..infra.repos import GroupsRepo, GroupAdminsRepo
+
+
+async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.chat_member or not update.effective_chat:
+        return
+    cm: ChatMemberUpdated = update.chat_member
+    user = cm.new_chat_member.user
+    status = cm.new_chat_member.status
+
+    async with db.SessionLocal() as s:  # type: ignore
+        await GroupsRepo(s).upsert_group(
+            gid=update.effective_chat.id,
+            title=update.effective_chat.title or str(update.effective_chat.id),
+            username=update.effective_chat.username,
+            gtype=update.effective_chat.type,
+        )
+        admins = GroupAdminsRepo(s)
+        # Track admin promotions/demotions/leaves
+        if status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
+            await admins.upsert_admin(update.effective_chat.id, user.id, status.value, rights={})
+        else:
+            await admins.delete_admin(update.effective_chat.id, user.id)
+        await s.commit()
+
+
+def register(app: Application) -> None:
+    # Track member updates for any user (promotions/demotions)
+    app.add_handler(ChatMemberHandler(on_chat_member))
+    # Seed/refresh snapshot when the bot itself is added to a chat
+    app.add_handler(ChatMemberHandler(on_my_chat_member, chat_member_types=ChatMemberHandler.MY_CHAT_MEMBER))
+    # On group messages, ensure group exists and seed admins if new
+    from telegram.ext import MessageHandler, filters
+    app.add_handler(MessageHandler(filters.ChatType.GROUPS, on_group_message), group=1)
+
+
+async def on_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Seed admins snapshot when the bot is added to a chat.
+
+    When the bot is added (or its status changes in a chat), fetch the current
+    administrators and upsert them into the snapshot so /panel can list groups
+    immediately without waiting for future promotions/demotions.
+    """
+    if not update.my_chat_member or not update.effective_chat:
+        return
+
+    chat = update.effective_chat
+    async with db.SessionLocal() as s:  # type: ignore
+        # Ensure the group record exists/updated
+        await GroupsRepo(s).upsert_group(
+            gid=chat.id,
+            title=chat.title or str(chat.id),
+            username=chat.username,
+            gtype=chat.type,
+        )
+
+        admins_repo = GroupAdminsRepo(s)
+        try:
+            admins = await context.bot.get_chat_administrators(chat.id)
+        except Exception:
+            admins = []
+        for cm in admins:
+            try:
+                await admins_repo.upsert_admin(chat.id, cm.user.id, str(cm.status), rights={})
+            except Exception:
+                # Best-effort seeding; continue on individual failures
+                pass
+        await s.commit()
+
+
+async def on_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Ensure a new group is recorded and admins are seeded on first message."""
+    if not update.effective_chat:
+        return
+    chat = update.effective_chat
+    async with db.SessionLocal() as s:  # type: ignore
+        from ..infra.models import Group
+
+        exists = await s.get(Group, chat.id)
+        if exists is not None:
+            return
+        await GroupsRepo(s).upsert_group(
+            gid=chat.id,
+            title=chat.title or str(chat.id),
+            username=chat.username,
+            gtype=chat.type,
+        )
+        admins_repo = GroupAdminsRepo(s)
+        try:
+            admins = await context.bot.get_chat_administrators(chat.id)
+        except Exception:
+            admins = []
+        for cm in admins:
+            try:
+                await admins_repo.upsert_admin(chat.id, cm.user.id, str(cm.status), rights={})
+            except Exception:
+                pass
+        await s.commit()

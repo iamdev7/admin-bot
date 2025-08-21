@@ -1,0 +1,139 @@
+{
+  "start.welcome": "👋 مرحباً {first_name}! استخدم /panel في الخاص لإدارة المجموعات.",
+  "help.text": "استخدم /panel في الخاص لإدارة المجموعات التي تديرها. في المجموعات يمكن للمشرفين استخدام /warn و /mute و /ban و /purge و /rules.",
+  "errors.generic": "حدث خطأ. حاول مرة أخرى لاحقاً.",
+  "welcome.message": "مرحباً {first_name} في {group_title}!",
+  "rules.default": "لم يتم تعيين قواعد المجموعة بعد.",
+  "rules.set.usage": "الاستخدام: /setrules <النص> أو بالرد مع /setrules",
+  "rules.set.ok": "تم تحديث القواعد.",
+  "panel.no_groups": "لا توجد مجموعات أنت مشرف فيها.",
+  "panel.pick_group": "اختر مجموعة للإدارة:",
+  "panel.open_dm": "افتح محادثة خاصة معي ثم أرسل /panel.",
+  "mod.reply_to_target": "قم بالرد على رسالة المستخدم لاستهدافه.",
+  "mod.warned": "تم تحذير المستخدم.",
+  "mod.warned_count": "تم التحذير. العدد: {count}.",
+  "mod.unwarned": "تم إزالة التحذير.",
+  "mod.unwarned_none": "لا يوجد تحذير لإزالته.",
+  "mod.muted": "تم تقييد المستخدم.",
+  "mod.unmuted": "تم إلغاء التقييد.",
+  "mod.banned": "تم حظر المستخدم.",
+  "mod.unbanned": "تم إلغاء الحظر.",
+  "mod.purged": "تم حذف {count} رسالة.",
+  "mod.warn_limit_reached": "تم الوصول للحد. تم تقييد المستخدم مؤقتاً.",
+  "antispam.warn": "الرجاء التمهل — تم اكتشاف تدفق رسائل.",
+  "antispam.muted": "تم تقييدك مؤقتاً بسبب تدفق الرسائل.",
+  "antispam.banned": "تم حظرك مؤقتاً بسبب تدفق الرسائل.",
+  "join.usage": "الاستخدام: /joinapprove on|off",
+  "join.set": "الموافقة التلقائية على طلبات الانضمام: {state}",
+  "rules.add.usage": "الاستخدام: /addrule <word|regex> <delete|warn|mute|ban> <pattern>",
+  "rules.add.ok": "تمت إضافة القاعدة بالمعرّف {id}.",
+  "rules.list.empty": "لا توجد قواعد محتوى.",
+  "rules.del.usage": "الاستخدام: /delrule <id>",
+  "rules.del.ok": "تم حذف القاعدة.",
+  "rules.del.missing": "لم يتم العثور على القاعدة.",
+  "content.warn": "يرجى تجنب المحتوى المخالف.",
+  "content.muted": "تم تقييدك بسبب المحتوى المخالف.",
+  "content.banned": "تم حظرك بسبب المحتوى المخالف.",
+  "panel.tabs": "الألسنة: مكافحة الإزعاج | القواعد",
+  "panel.tab.moderation": "الإشراف",
+  "panel.tab.antispam": "مكافحة الإزعاج",
+  "panel.tab.rules": "القواعد",
+  "panel.tab.welcome": "الترحيب",
+  "panel.tab.onboarding": "الانضمام",
+  "panel.tab.language": "اللغة",
+  "panel.tab.automations": "الأتمتة",
+  "panel.tab.audit": "السجل",
+  "panel.antispam.title": "إعدادات مكافحة الإزعاج",
+  "panel.antispam.current": "النافذة: {window}ث، العتبة: {threshold}, التقييد: {mute}ث، الحظر: {ban}ث",
+  "panel.antispam.presets": "الملفات الجاهزة:",
+  "panel.preset.lenient": "مرن",
+  "panel.preset.normal": "عادي",
+  "panel.preset.strict": "صارم",
+  "panel.saved": "تم الحفظ.",
+  "panel.rules.title": "القواعد",
+  "panel.rules.current": "طول القواعد الحالي: {n}",
+  "panel.rules.prompt": "أرسل نص القواعد الآن.",
+  "panel.rules.saved": "تم حفظ القواعد.",
+  "panel.rules.add": "إضافة قاعدة",
+  "panel.rules.list": "عرض القواعد",
+  "panel.rules.list_title": "قواعد المحتوى:",
+  "panel.rules.edittext": "تعديل نص القواعد",
+  "panel.rules.add_type": "اختر نوع القاعدة:",
+  "panel.rules.add_action": "اختر الإجراء:",
+  "panel.rules.add_prompt": "أرسل نمط المطابقة الآن.",
+  "panel.rules.reply_prompt": "أرسل نص الرد التلقائي الآن.",
+  "panel.welcome.title": "إعدادات الترحيب",
+  "panel.welcome.edit": "تعديل رسالة الترحيب",
+  "panel.welcome.prompt": "أرسل نص رسالة الترحيب الآن.",
+  "panel.moderation.title": "الإشراف",
+  "panel.moderation.recent": "الإجراءات الأخيرة",
+  "panel.moderation.warn_limit": "حد التحذيرات: {n}",
+  "panel.moderation.delete_offense": "حذف الرسائل المخالفة: {state}",
+  "panel.links.policy": "سياسة الروابط",
+  "panel.links.title": "سياسة الروابط",
+  "panel.links.toggle_block_all": "تبديل حظر كل الروابط",
+  "panel.links.add": "إضافة نطاق محظور",
+  "panel.links.add_prompt": "أرسل النطاق لحظره (مثال: example.com)",
+  "panel.links.allowlist": "القائمة البيضاء",
+  "panel.links.allow_add": "إضافة نطاق مسموح",
+  "panel.links.allow_add_prompt": "أرسل النطاق للسماح به (مثال: example.com)",
+  "panel.links.type_actions": "إجراءات الروابط حسب النوع",
+  "panel.links.cat.invites": "دعوات",
+  "panel.links.cat.telegram": "روابط تيليجرام",
+  "panel.links.cat.shorteners": "مُختصرات",
+  "panel.links.cat.other": "روابط أخرى",
+  "panel.links.night": "الوضع الليلي",
+  "panel.links.night_title": "الوضع الليلي للروابط",
+  "panel.locks.title": "قفل التحويلات والوسائط",
+  "panel.locks.forwards": "التحويلات",
+  "panel.locks.media": "أنواع الوسائط",
+  "panel.onboarding.title": "إعدادات الانضمام",
+  "panel.onboarding.auto": "الموافقة التلقائية على طلبات الانضمام: {state}",
+  "panel.onboarding.require": "يتطلب قبول القواعد: {state}",
+  "panel.onboarding.toggle_require": "تبديل الطلب",
+  "panel.onboarding.require_unmute": "يتطلب قبول القواعد لفك التقييد: {state}",
+  "panel.onboarding.toggle_unmute": "تبديل شرط فك التقييد",
+  "panel.onboarding.captcha": "التحقق (كابتشا): {state}",
+  "panel.onboarding.captcha_toggle": "تبديل الكابتشا",
+  "panel.toggle": "تبديل",
+  "panel.language.title": "اللغة",
+  "panel.auto.title": "الأتمتة",
+  "panel.auto.add_announce": "إضافة إعلان",
+  "panel.auto.add_pin": "تدوير التثبيت",
+  "panel.auto.add_unmute": "فك التقييد المؤقت",
+  "panel.auto.add_unban": "فك الحظر المؤقت",
+  "panel.auto.pick_mode": "جدولة الإعلان: مرة أم متكرر؟",
+  "panel.auto.once": "مرة",
+  "panel.auto.repeat": "متكرر",
+  "panel.auto.pick_delay": "اختر التأخير قبل الإرسال الأول:",
+  "panel.auto.pick_interval": "اختر فترة التكرار:",
+  "panel.auto.pin_pick_interval": "اختر فترة تدوير التثبيت:",
+  "panel.auto.pin_prompt_text": "أرسل النص الذي سيتم تثبيته في كل تدوير.",
+  "panel.auto.prompt_text": "أرسل نص الإعلان الآن.",
+  "panel.auto.prompt_uid": "أرسل معرف المستخدم الآن.",
+  "panel.audit.title": "سجل العمليات",
+  "panel.audit.empty": "لا توجد عمليات بعد.",
+  "panel.back": "رجوع",
+  "welcome.read_accept": "قراءة والموافقة على القواعد",
+  "panel.welcome.ttl": "حذف الترحيب تلقائياً: {state}",
+  "common.off": "إيقاف",
+  "action.allow": "سماح",
+  "action.delete": "حذف",
+  "action.warn": "تحذير",
+  "action.mute": "تقييد",
+  "action.ban": "حظر",
+  "join.dm.text": "يرجى الاطلاع على قواعد {group_title} ثم اضغط قبول للانضمام.\n\n{rules}",
+  "join.dm.rules": "قواعد مجموعة {group_title}:\n\n{rules}",
+  "join.accept": "أقبل القواعد",
+  "join.decline": "أرفض",
+  "captcha.prompt": "يرجى التحقق أنك إنسان.",
+  "captcha.math": "احسب: {a} + {b} = ؟",
+  "captcha.im_human": "أنا إنسان",
+  "topic.not_in_forum": "استخدم هذا داخل موضوع المنتدى.",
+  "topic.closed": "تم إغلاق الموضوع.",
+  "topic.opened": "تم فتح الموضوع.",
+  "topic.rename_usage": "الاستخدام: /topic_rename <الاسم>",
+  "topic.renamed": "تم تغيير اسم الموضوع.",
+  "topic.pin_usage": "قم بالرد على رسالة ثم أرسل /topic_pin.",
+  "topic.pinned": "تم تثبيت الرسالة."
+}

@@ -1,0 +1,10 @@
+python-telegram-bot[callback-data,job-queue,rate-limiter]<23,>=22
+SQLAlchemy<3,>=2
+aiosqlite>=0.19
+python-dotenv>=1.0
+pydantic<2,>=1.10
+
+[dev]
+ruff>=0.4
+black>=24.1
+mypy>=1.7

@@ -1,0 +1,50 @@
+[project]
+name = "telegram-admin-bot"
+version = "0.1.0"
+description = "Production-grade, extensible Telegram group-management bot (async, PTB v22, SQLite)"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "Contributors" }
+]
+dependencies = [
+  "python-telegram-bot[callback-data,job-queue,rate-limiter]>=22,<23",
+  "SQLAlchemy>=2,<3",
+  "aiosqlite>=0.19",
+  "python-dotenv>=1.0",
+  "pydantic>=1.10,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.4",
+  "black>=24.1",
+  "mypy>=1.7",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+select = ["E","F","I","UP","B","N","Q"]
+target-version = "py311"
+exclude = [".venv", "data"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+strict_optional = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[build-system]
+requires = ["setuptools>=67", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["bot*"]
+
+[tool.setuptools.package-data]
+"bot.locales" = ["*.json"]
