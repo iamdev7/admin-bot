@@ -6,6 +6,7 @@ from typing import Optional
 from telegram import ChatPermissions, Update
 from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
+import logging
 
 from ...core.permissions import require_admin
 from ...core.utils import parse_duration
@@ -14,6 +15,7 @@ from ...infra import db
 from ...infra.repos import AuditRepo, WarnsRepo
 from ...infra.settings_repo import SettingsRepo
 from ..antispam.handlers import get_antispam_config
+log = logging.getLogger(__name__)
 
 
 def _target_user_id(update: Update) -> Optional[int]:
@@ -49,8 +51,8 @@ async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 permissions=ChatPermissions(can_send_messages=False),
                 until_date=until_date,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            log.exception("moderation warn escalate mute failed gid=%s uid=%s: %s", gid, target_id, e)
         async with db.SessionLocal() as s:  # type: ignore
             await WarnsRepo(s).reset(gid, target_id)
             await s.commit()
@@ -88,8 +90,8 @@ async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             permissions=ChatPermissions(can_send_messages=False),
             until_date=until_date,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        log.exception("moderation mute failed gid=%s uid=%s: %s", update.effective_chat.id, target_id, e)
     async with db.SessionLocal() as s:  # type: ignore
         await AuditRepo(s).log(
             update.effective_chat.id,
@@ -114,8 +116,8 @@ async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             target_id,
             permissions=ChatPermissions(can_send_messages=True),
         )
-    except Exception:
-        pass
+    except Exception as e:
+        log.exception("moderation unmute failed gid=%s uid=%s: %s", update.effective_chat.id, target_id, e)
     async with db.SessionLocal() as s:  # type: ignore
         await AuditRepo(s).log(update.effective_chat.id, update.effective_user.id, "unmute", target_id, {})
         await s.commit()
@@ -132,8 +134,8 @@ async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     until_date = None if duration is None else datetime.utcnow() + duration
     try:
         await context.bot.ban_chat_member(update.effective_chat.id, target_id, until_date=until_date)
-    except Exception:
-        pass
+    except Exception as e:
+        log.exception("moderation ban failed gid=%s uid=%s: %s", update.effective_chat.id, target_id, e)
     async with db.SessionLocal() as s:  # type: ignore
         await AuditRepo(s).log(
             update.effective_chat.id,
@@ -154,8 +156,8 @@ async def unban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return await update.effective_message.reply_text(t(lang, "mod.reply_to_target"))
     try:
         await context.bot.unban_chat_member(update.effective_chat.id, target_id, only_if_banned=True)
-    except Exception:
-        pass
+    except Exception as e:
+        log.exception("moderation unban failed gid=%s uid=%s: %s", update.effective_chat.id, target_id, e)
     async with db.SessionLocal() as s:  # type: ignore
         await AuditRepo(s).log(update.effective_chat.id, update.effective_user.id, "unban", target_id, {})
         await s.commit()
@@ -173,7 +175,7 @@ async def purge(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         for mid in range(msg.message_id - count, msg.message_id):
             try:
                 await context.bot.delete_message(msg.chat_id, mid)
-            except Exception:
-                pass
+            except Exception as e:
+                log.exception("moderation purge delete failed gid=%s mid=%s: %s", msg.chat_id, mid, e)
     finally:
         await msg.reply_text(t(lang, "mod.purged", count=count))

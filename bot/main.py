@@ -21,6 +21,8 @@ from telegram.ext import (
 
 from .core.config import settings
 from .core.i18n import I18N, t
+import logging
+log = logging.getLogger(__name__)
 from .core.logging import setup_logging
 from .core.errors import register_error_handler
 from .infra.db import init_engine, init_sessionmaker
@@ -96,6 +98,73 @@ def make_app() -> Application:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = I18N.pick_lang(update, fallback=settings.DEFAULT_LANG)
+    # Handle deep-link: /start rules_<gid> | rulesu_<username> | rules64_<b64(gid)>
+    param: str | None = None
+    if context.args:
+        param = context.args[0]
+    else:
+        txt = update.effective_message.text or ""
+        parts = txt.split(maxsplit=1)
+        if len(parts) == 2:
+            param = parts[1]
+    gid: int | None = None
+    if param:
+        if param.startswith("rulesu_"):
+            uname = param[7:]
+            try:
+                chat = await context.bot.get_chat(f"@{uname}")
+                gid = chat.id
+            except Exception as e:
+                log.exception("get_chat by username failed for %s: %s", uname, e)
+                gid = None
+        elif param.startswith("rules64_"):
+            import base64
+            data = param[8:]
+            # Add padding back for urlsafe b64
+            pad = '=' * (-len(data) % 4)
+            try:
+                decoded = base64.urlsafe_b64decode(data + pad).decode()
+                gid = int(decoded)
+            except Exception as e:
+                log.exception("Failed to decode rules64 payload '%s': %s", data, e)
+                gid = None
+        elif param.startswith("rules_"):
+            gid_s = param[7:]
+            try:
+                gid = int(gid_s)
+            except ValueError:
+                gid = None
+
+    if gid is not None:
+            from .infra import db
+            from .infra.settings_repo import SettingsRepo
+            rules_text = None
+            group_title = str(gid)
+            async with db.SessionLocal() as s:  # type: ignore
+                rules_text = await SettingsRepo(s).get_text(gid, "rules")
+                # DB fallback title (in case get_chat fails)
+                try:
+                    from .infra.models import Group
+                    g = await s.get(Group, gid)
+                    if g and g.title:
+                        group_title = g.title
+                except Exception as e:
+                    log.exception("Failed to read group title from DB gid=%s: %s", gid, e)
+            # Try live chat info for accurate title
+            try:
+                chat = await context.bot.get_chat(gid)
+                if chat and chat.title:
+                    group_title = chat.title
+            except Exception as e:
+                log.exception("get_chat failed for gid=%s: %s", gid, e)
+            header = t(lang, "rules.dm.header")
+            txt = header + "\n\n" + t(lang, "join.dm.rules", group_title=group_title, rules=rules_text or t(lang, "rules.default"))
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            uid = update.effective_user.id if update.effective_user else 0
+            kb = InlineKeyboardMarkup([[InlineKeyboardButton(t(lang, "join.accept"), callback_data=f"rules:accept:{gid}:{uid}")]])
+            await update.effective_message.reply_text(txt, reply_markup=kb)
+            return
     text = t(lang, "start.welcome", first_name=update.effective_user.first_name or "")
     await update.effective_message.reply_text(text, parse_mode=ParseMode.HTML)
 

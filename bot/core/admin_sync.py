@@ -3,10 +3,12 @@ from __future__ import annotations
 from telegram import ChatMemberUpdated, Update
 from telegram.constants import ChatMemberStatus
 from telegram.ext import Application, ChatMemberHandler, ContextTypes
+import logging
 
 from .i18n import I18N
 from ..infra import db
 from ..infra.repos import GroupsRepo, GroupAdminsRepo
+log = logging.getLogger(__name__)
 
 
 async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -65,14 +67,14 @@ async def on_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         admins_repo = GroupAdminsRepo(s)
         try:
             admins = await context.bot.get_chat_administrators(chat.id)
-        except Exception:
+        except Exception as e:
+            log.exception("admin_sync get_chat_administrators failed gid=%s: %s", chat.id, e)
             admins = []
         for cm in admins:
             try:
                 await admins_repo.upsert_admin(chat.id, cm.user.id, str(cm.status), rights={})
-            except Exception:
-                # Best-effort seeding; continue on individual failures
-                pass
+            except Exception as e:
+                log.exception("admin_sync upsert_admin failed gid=%s uid=%s: %s", chat.id, cm.user.id, e)
         await s.commit()
 
 
@@ -96,11 +98,12 @@ async def on_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         admins_repo = GroupAdminsRepo(s)
         try:
             admins = await context.bot.get_chat_administrators(chat.id)
-        except Exception:
+        except Exception as e:
+            log.exception("admin_sync get_chat_administrators (msg) failed gid=%s: %s", chat.id, e)
             admins = []
         for cm in admins:
             try:
                 await admins_repo.upsert_admin(chat.id, cm.user.id, str(cm.status), rights={})
-            except Exception:
-                pass
+            except Exception as e:
+                log.exception("admin_sync upsert_admin (msg) failed gid=%s uid=%s: %s", chat.id, cm.user.id, e)
         await s.commit()

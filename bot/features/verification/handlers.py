@@ -6,10 +6,12 @@ from dataclasses import dataclass
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ChatPermissions
 from telegram.ext import ContextTypes
+import logging
 
 from ...core.i18n import I18N, t
 from ...infra import db
 from ...infra.settings_repo import SettingsRepo
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -54,8 +56,8 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             permissions=ChatPermissions(can_send_messages=False),
             until_date=int(time.time()) + timeout + 60,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        log.exception("verify: restrict failed gid=%s uid=%s: %s", chat.id, user.id, e)
     # Prepare captcha
     answer = None
     text = t(lang, "captcha.prompt")
@@ -97,12 +99,12 @@ async def on_captcha_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Verified
         try:
             await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=True))
-        except Exception:
-            pass
+        except Exception as e:
+            log.exception("verify: unrestrict failed gid=%s uid=%s: %s", chat_id, user_id, e)
         try:
             await context.bot.delete_message(chat_id, pending.message_id)
-        except Exception:
-            pass
+        except Exception as e:
+            log.exception("verify: delete captcha message failed gid=%s mid=%s: %s", chat_id, pending.message_id, e)
         _store(context).pop((chat_id, user_id), None)
         # cancel job
         for jb in context.job_queue.get_jobs_by_name(f"verify:{chat_id}:{user_id}"):
@@ -122,7 +124,6 @@ async def timeout_kick(context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         await context.bot.ban_chat_member(chat_id, user_id)
         await context.bot.unban_chat_member(chat_id, user_id)
-    except Exception:
-        pass
+    except Exception as e:
+        log.exception("verify: timeout kick failed gid=%s uid=%s: %s", chat_id, user_id, e)
     _store(context).pop((chat_id, user_id), None)
-

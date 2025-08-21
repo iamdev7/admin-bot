@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ChatPermissions
+import base64
 from telegram.ext import ContextTypes
+import logging
 
 from ...infra import db
 from ...infra.settings_repo import SettingsRepo
 from ...core.permissions import require_admin
 from ...core.i18n import I18N, t
+
+log = logging.getLogger(__name__)
 
 
 async def on_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -28,7 +32,13 @@ async def on_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if require_accept:
         # Attempt DM
         lang_code = (req.from_user.language_code or "en").split("-")[0]
-        text = t(lang_code, "join.dm.text", group_title=req.chat.title or "", rules=rules_text or t(lang_code, "rules.default"))
+        header = t(lang_code, "rules.dm.header")
+        text = header + "\n\n" + t(
+            lang_code,
+            "join.dm.text",
+            group_title=req.chat.title or "",
+            rules=rules_text or t(lang_code, "rules.default"),
+        )
         kb = InlineKeyboardMarkup(
             [
                 [
@@ -39,30 +49,78 @@ async def on_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
         try:
             await context.bot.send_message(req.from_user.id, text, reply_markup=kb)
-        except Exception:
+        except Exception as e:
+            log.exception("Failed to DM rules for pre-approval gid=%s uid=%s: %s", gid, req.from_user.id, e)
             # Can't DM; leave pending until the user starts the bot
             return
         # Leave pending for explicit acceptance
         return
 
     if approve:
-        # Send rules to the user first (without requiring acceptance), then approve
+        # Check if we require acceptance to unmute after approval (default True unless require_accept pre-approval is used)
+        require_unmute = bool((ob or {}).get("require_accept_unmute", True)) and not bool((ob or {}).get("require_accept", False))
         lang_code = (req.from_user.language_code or "en").split("-")[0]
+        # Try to DM rules with Accept button (even if it fails, proceed)
         try:
-            text = t(
+            header = t(lang_code, "rules.dm.header")
+            text = header + "\n\n" + t(
                 lang_code,
                 "join.dm.rules",
                 group_title=req.chat.title or "",
                 rules=rules_text or t(lang_code, "rules.default"),
             )
-            await context.bot.send_message(req.from_user.id, text)
-        except Exception:
-            # If we can't DM (user hasn't started bot), continue to approve
-            pass
+            kb_dm = InlineKeyboardMarkup(
+                [[InlineKeyboardButton(t(lang_code, "join.accept"), callback_data=f"rules:accept:{gid}:{req.from_user.id}")]]
+            )
+            await context.bot.send_message(req.from_user.id, text, reply_markup=kb_dm)
+        except Exception as e:
+            log.exception("Failed to DM rules after auto-approve gid=%s uid=%s: %s", gid, req.from_user.id, e)
+        # Approve the join
         try:
             await context.bot.approve_chat_join_request(gid, req.from_user.id)
-        except Exception:
-            pass
+        except Exception as e:
+            log.exception("Failed to approve join request gid=%s uid=%s: %s", gid, req.from_user.id, e)
+        # If require_unmute: restrict user and post welcome with deep-link
+        if require_unmute:
+            try:
+                await context.bot.restrict_chat_member(gid, req.from_user.id, permissions=ChatPermissions(can_send_messages=False))
+            except Exception as e:
+                log.exception("Failed to mute after approve gid=%s uid=%s: %s", gid, req.from_user.id, e)
+            try:
+                bot_username = (await context.bot.get_me()).username or ""
+                # Prefer username-based payload when available to avoid negative ID encoding issues
+                payload = (
+                    f"rulesu_{req.chat.username}" if getattr(req.chat, "username", None) else f"rules64_{base64.urlsafe_b64encode(str(gid).encode()).decode().rstrip('=')}"
+                )
+                deep_link = f"https://t.me/{bot_username}?start={payload}"
+                lang = lang_code
+                text_w = t(
+                    lang,
+                    "welcome.must_accept",
+                    first_name=req.from_user.first_name or "",
+                    group_title=req.chat.title or "",
+                )
+                kb = InlineKeyboardMarkup([[InlineKeyboardButton(t(lang, "welcome.read_accept"), url=deep_link)]])
+                m = await context.bot.send_message(gid, text_w, reply_markup=kb)
+                # Schedule auto-delete if TTL configured
+                async def _delete_job(ctx: ContextTypes.DEFAULT_TYPE):
+                    try:
+                        await ctx.bot.delete_message(gid, m.message_id)
+                    except Exception as e:
+                        log.exception("Failed to auto-delete welcome gid=%s mid=%s: %s", gid, m.message_id, e)
+
+                # Read TTL from welcome settings
+                try:
+                    async with db.SessionLocal() as s:  # type: ignore
+                        wcfg = await SettingsRepo(s).get(gid, "welcome") or {}
+                        ttl = int(wcfg.get("ttl_sec", 0) or 0)
+                except Exception as e:
+                    log.exception("Failed reading welcome ttl gid=%s: %s", gid, e)
+                    ttl = 0
+                if ttl and ttl > 0:
+                    context.job_queue.run_once(_delete_job, when=ttl)
+            except Exception as e:
+                log.exception("Failed to post welcome with deep-link gid=%s: %s", gid, e)
 
 
 @require_admin
@@ -95,14 +153,105 @@ async def on_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if action == "accept":
         try:
             await context.bot.approve_chat_join_request(gid, uid)
-        except Exception:
-            pass
-        # Optionally confirm to user
+        except Exception as e:
+            log.exception("Failed to approve from pre-approval accept gid=%s uid=%s: %s", gid, uid, e)
+        # Edit only the buttons on the original DM to a Return button, keep rules text
         lang = I18N.pick_lang(update)
-        await update.effective_message.reply_text("✅")
+        return_kb = None
+        try:
+            chat = await context.bot.get_chat(gid)
+            if getattr(chat, "username", None):
+                url = f"https://t.me/{chat.username}"
+                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+                return_kb = InlineKeyboardMarkup(
+                    [[InlineKeyboardButton(t(lang, "rules.return_group"), url=url)]]
+                )
+        except Exception as e:
+            log.exception("Failed building return button via get_chat gid=%s: %s", gid, e)
+            return_kb = None
+        if return_kb is None:
+            # Fallback to DB username
+            try:
+                from ...infra.models import Group
+                async with db.SessionLocal() as s:  # type: ignore
+                    g = await s.get(Group, gid)
+                    if g and g.username:
+                        url = f"https://t.me/{g.username}"
+                        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                        return_kb = InlineKeyboardMarkup(
+                            [[InlineKeyboardButton(t(lang, "rules.return_group"), url=url)]]
+                        )
+            except Exception:
+                return_kb = None
+        try:
+            await update.effective_message.edit_reply_markup(return_kb)
+        except Exception as e:
+            log.exception("Failed to edit reply markup on rules DM gid=%s uid=%s: %s", gid, uid, e)
+        # Send a thank-you message below
+        try:
+            await update.effective_message.reply_text(t(lang, "rules.accepted"))
+        except Exception as e:
+            log.exception("Failed to send thank-you below rules gid=%s uid=%s: %s", gid, uid, e)
     elif action == "decline":
         try:
             await context.bot.decline_chat_join_request(gid, uid)
-        except Exception:
-            pass
+        except Exception as e:
+            log.exception("Failed to decline join gid=%s uid=%s: %s", gid, uid, e)
         await update.effective_message.reply_text("❌")
+
+
+async def on_rules_accept(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.callback_query:
+        return
+    await update.callback_query.answer()
+    data = (update.callback_query.data or "").split(":")
+    if len(data) != 4:
+        return
+    _, _, gid_s, uid_s = data
+    gid = int(gid_s)
+    uid = int(uid_s)
+    if not update.effective_user or update.effective_user.id != uid:
+        return
+    # Unmute first
+    try:
+        await context.bot.restrict_chat_member(gid, uid, permissions=ChatPermissions(can_send_messages=True))
+    except Exception as e:
+        log.exception("Failed to unmute on rules accept gid=%s uid=%s: %s", gid, uid, e)
+    # Replace only the buttons on the original rules message; keep rules visible
+    lang = I18N.pick_lang(update)
+    return_kb = None
+    try:
+        chat = await context.bot.get_chat(gid)
+        if getattr(chat, "username", None):
+            url = f"https://t.me/{chat.username}"
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            return_kb = InlineKeyboardMarkup([[InlineKeyboardButton(t(lang, "rules.return_group"), url=url)]])
+    except Exception as e:
+        log.exception("Failed building return button via get_chat (rules accept) gid=%s: %s", gid, e)
+        return_kb = None
+    if return_kb is None:
+        # Fallback to DB username
+        try:
+            from ...infra.models import Group
+            async with db.SessionLocal() as s:  # type: ignore
+                g = await s.get(Group, gid)
+                if g and g.username:
+                    url = f"https://t.me/{g.username}"
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    return_kb = InlineKeyboardMarkup(
+                        [[InlineKeyboardButton(t(lang, "rules.return_group"), url=url)]]
+                    )
+        except Exception:
+            return_kb = None
+    # Update only reply markup on the original rules message
+    try:
+        await update.effective_message.edit_reply_markup(return_kb)
+    except Exception as e:
+        log.exception("Failed to edit reply markup (rules accept) gid=%s uid=%s: %s", gid, uid, e)
+    # Send a separate thank-you message below
+    try:
+        await update.effective_message.reply_text(t(lang, "rules.accepted"))
+    except Exception as e:
+        log.exception("Failed to send thank-you (rules accept) gid=%s uid=%s: %s", gid, uid, e)

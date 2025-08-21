@@ -23,6 +23,6 @@ async def delete_message(context: ContextTypes.DEFAULT_TYPE) -> None:
     data = context.job.data or {}
     try:
         await context.bot.delete_message(data.get("chat_id"), data.get("message_id"))
-    except Exception:
-        pass
-
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception("ephemeral delete failed chat=%s mid=%s: %s", data.get("chat_id"), data.get("message_id"), e)

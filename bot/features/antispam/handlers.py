@@ -157,16 +157,18 @@ async def enforce_content_rules(update: Update, context: ContextTypes.DEFAULT_TY
                 # Delete first, then warn (send as a normal message, not reply)
                 try:
                     await context.bot.delete_message(gid, update.effective_message.message_id)
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).exception("antispam delete before warn failed gid=%s: %s", gid, e)
                 await context.bot.send_message(gid, t(lang, "content.warn"))
                 await handle_warn_escalation(gid, update.effective_user.id, update, context)
             elif eff_action == "mute":
                 # Delete first, then restrict
                 try:
                     await context.bot.delete_message(gid, update.effective_message.message_id)
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).exception("antispam delete before mute failed gid=%s: %s", gid, e)
                 cfg = await get_antispam_config(gid)
                 until = int(time.time()) + int(cfg["mute_seconds"])
                 await context.bot.restrict_chat_member(
@@ -180,8 +182,9 @@ async def enforce_content_rules(update: Update, context: ContextTypes.DEFAULT_TY
                 # Delete first, then temp-ban
                 try:
                     await context.bot.delete_message(gid, update.effective_message.message_id)
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).exception("antispam delete before ban failed gid=%s: %s", gid, e)
                 cfg = await get_antispam_config(gid)
                 until = int(time.time()) + int(cfg["ban_seconds"])
                 await context.bot.ban_chat_member(gid, update.effective_user.id, until_date=until)
@@ -273,15 +276,17 @@ async def enforce_link_policy(update: Update, context: ContextTypes.DEFAULT_TYPE
     if decided_action == "delete":
         try:
             await context.bot.delete_message(update.effective_chat.id, update.effective_message.message_id)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception("links delete failed gid=%s: %s", update.effective_chat.id, e)
         return True
     if decided_action == "warn":
         # Delete first, then warn (send as a normal message)
         try:
             await context.bot.delete_message(update.effective_chat.id, update.effective_message.message_id)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception("links delete before warn failed gid=%s: %s", update.effective_chat.id, e)
         await context.bot.send_message(update.effective_chat.id, t(lang, "content.warn"))
         await handle_warn_escalation(update.effective_chat.id, update.effective_user.id, update, context)
         return True
@@ -291,8 +296,9 @@ async def enforce_link_policy(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Delete first, then mute
         try:
             await context.bot.delete_message(update.effective_chat.id, update.effective_message.message_id)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception("links delete before mute failed gid=%s: %s", update.effective_chat.id, e)
         await context.bot.restrict_chat_member(
             update.effective_chat.id,
             update.effective_user.id,
@@ -306,8 +312,9 @@ async def enforce_link_policy(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Delete first, then ban
         try:
             await context.bot.delete_message(update.effective_chat.id, update.effective_message.message_id)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception("links delete before ban failed gid=%s: %s", update.effective_chat.id, e)
         await context.bot.ban_chat_member(update.effective_chat.id, update.effective_user.id, until_date=until)
         await context.bot.send_message(update.effective_chat.id, t(lang, "content.banned"))
         return True
@@ -384,15 +391,17 @@ async def apply_lock_action(action: str, gid: int, uid: int, update: Update, con
     if action == "delete":
         try:
             await context.bot.delete_message(gid, update.effective_message.message_id)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception("locks delete failed gid=%s: %s", gid, e)
         return
     if action == "warn":
         # Delete first, then warn (send as a normal message)
         try:
             await context.bot.delete_message(gid, update.effective_message.message_id)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception("locks delete before warn failed gid=%s: %s", gid, e)
         await context.bot.send_message(gid, t(lang, "content.warn"))
         await handle_warn_escalation(gid, uid, update, context)
         return
@@ -402,8 +411,9 @@ async def apply_lock_action(action: str, gid: int, uid: int, update: Update, con
         # Delete first, then mute
         try:
             await context.bot.delete_message(gid, update.effective_message.message_id)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception("locks delete before mute failed gid=%s: %s", gid, e)
         await context.bot.restrict_chat_member(
             gid, uid, permissions=ChatPermissions(can_send_messages=False), until_date=until
         )
@@ -414,8 +424,9 @@ async def apply_lock_action(action: str, gid: int, uid: int, update: Update, con
         # Delete first, then ban
         try:
             await context.bot.delete_message(gid, update.effective_message.message_id)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception("locks delete before ban failed gid=%s: %s", gid, e)
         await context.bot.ban_chat_member(gid, uid, until_date=until)
         await context.bot.send_message(gid, t(lang, "content.banned"))
         return
@@ -456,8 +467,9 @@ async def maybe_delete_offense(gid: int, update: Update, context: ContextTypes.D
     if bool(cfg.get("delete_offense", True)):
         try:
             await context.bot.delete_message(gid, update.effective_message.message_id)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception("maybe_delete_offense failed gid=%s: %s", gid, e)
 
 
 async def handle_warn_escalation(gid: int, uid: int, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -480,8 +492,9 @@ async def handle_warn_escalation(gid: int, uid: int, update: Update, context: Co
                 permissions=ChatPermissions(can_send_messages=False),
                 until_date=until,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception("warn escalation mute failed gid=%s uid=%s: %s", gid, uid, e)
         async with db.SessionLocal() as s:  # type: ignore
             from ...infra.repos import WarnsRepo
 

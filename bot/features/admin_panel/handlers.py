@@ -3,10 +3,54 @@ from __future__ import annotations
 from __future__ import annotations
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ChatPermissions
+from telegram.error import BadRequest
 from telegram.ext import CallbackQueryHandler, ContextTypes, MessageHandler, filters
 import time
 
 from ...core.i18n import I18N, t
+import logging
+log = logging.getLogger(__name__)
+
+def _panel_lang(update, gid: int | None) -> str:
+    try:
+        if gid is not None:
+            from ...core.i18n import I18N as _I
+            gl = _I.get_group_lang(gid)
+            if gl:
+                return gl
+    except Exception:
+        pass
+    return I18N.pick_lang(update)
+
+
+async def _safe_edit(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str, text: str, kb_rows: list[list[InlineKeyboardButton]]) -> None:
+    """Edit panel message only if view changed; ignore 'Message is not modified'."""
+    try:
+        last = context.user_data.get("panel_last_view")
+        if last == key:
+            return
+        await update.effective_message.edit_text(text, reply_markup=InlineKeyboardMarkup(kb_rows))
+        context.user_data["panel_last_view"] = key
+    except BadRequest as e:
+        if "Message is not modified" in str(e):
+            return
+        raise
+
+
+async def _safe_edit_msg(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id: int, key: str, text: str, kb_rows: list[list[InlineKeyboardButton]]) -> None:
+    try:
+        # Check if user_data is available (might not be in job context)
+        if context.user_data:
+            last = context.user_data.get("panel_last_view")
+            if last == key:
+                return
+        await context.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text, reply_markup=InlineKeyboardMarkup(kb_rows))
+        if context.user_data:
+            context.user_data["panel_last_view"] = key
+    except BadRequest as e:
+        if "Message is not modified" in str(e):
+            return
+        raise
 from ...core.permissions import require_admin
 from ...infra import db
 from ...infra.repos import GroupsRepo
@@ -72,12 +116,12 @@ def tabs_keyboard(lang: str, gid: int) -> InlineKeyboardMarkup:
 
 
 async def open_group(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
-    lang = I18N.pick_lang(update)
+    lang = _panel_lang(update, gid)
     await update.effective_message.edit_text(t(lang, "panel.tabs"), reply_markup=tabs_keyboard(lang, gid))
 
 
 async def show_antispam(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
-    lang = I18N.pick_lang(update)
+    lang = _panel_lang(update, gid)
     async with db.SessionLocal() as s:  # type: ignore
         cfg = await SettingsRepo(s).get(gid, "antispam") or {}
     window = cfg.get("window_sec", 5)
@@ -99,7 +143,7 @@ async def show_antispam(update: Update, context: ContextTypes.DEFAULT_TYPE, gid:
 
 
 async def show_rules(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
-    lang = I18N.pick_lang(update)
+    lang = _panel_lang(update, gid)
     async with db.SessionLocal() as s:  # type: ignore
         text = await SettingsRepo(s).get_text(gid, "rules")
     n = len(text) if text else 0
@@ -120,7 +164,7 @@ async def show_rules(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: in
 
 
 async def list_rules(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int, page: int) -> None:
-    lang = I18N.pick_lang(update)
+    lang = _panel_lang(update, gid)
     async with db.SessionLocal() as s:  # type: ignore
         rules = await FiltersRepo(s).list_rules(gid, limit=200)
     page_size = 10
@@ -151,7 +195,7 @@ async def list_rules(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: in
 
 
 async def rules_add_pick_type(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
-    lang = I18N.pick_lang(update)
+    lang = _panel_lang(update, gid)
     kb = [
         [
             InlineKeyboardButton("word", callback_data=f"panel:group:{gid}:rules:add:type:word"),
@@ -163,7 +207,7 @@ async def rules_add_pick_type(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def rules_add_pick_action(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int, ftype: str) -> None:
-    lang = I18N.pick_lang(update)
+    lang = _panel_lang(update, gid)
     kb = [
         [
             InlineKeyboardButton("delete", callback_data=f"panel:group:{gid}:rules:add:action:{ftype}:delete"),
@@ -191,6 +235,17 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if len(parts) >= 4 and parts[0] == "panel" and parts[1] == "group":
         gid = int(parts[2])
         user_id = update.effective_user.id if update.effective_user else 0
+        # Ensure group lang is applied even after restart
+        try:
+            async with db.SessionLocal() as s:  # type: ignore
+                from ...infra.settings_repo import SettingsRepo as _SR
+                lang_cfg = await _SR(s).get(gid, "language") or {}
+                code = lang_cfg.get("code")
+                if code:
+                    from ...core.i18n import I18N as _I
+                    _I.set_group_lang(gid, code)
+        except Exception:
+            pass
         if not await _is_admin_of(context, user_id, gid):
             return
         if len(parts) >= 5 and parts[3] == "tab":
@@ -209,10 +264,32 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 return await show_welcome(update, context, gid)
             if tab == "automations":
                 return await show_automations(update, context, gid)
-            if tab == "onboarding":
-                return await show_onboarding(update, context, gid)
-            if tab == "audit":
-                return await show_audit(update, context, gid, page=0)
+
+        if len(parts) >= 5 and parts[3] == "auto2":
+            step = parts[4]
+            if step == "menu":
+                import asyncio
+                return await auto2_menu(update, context, gid)
+            if step == "announce":
+                if len(parts) == 5:
+                    return await auto2_pick_announce_mode(update, context, gid)
+                if len(parts) >= 6 and parts[5] == "once":
+                    return await auto2_pick_delay(update, context, gid, key="announce")
+                if len(parts) >= 6 and parts[5] == "repeat":
+                    return await auto2_pick_interval(update, context, gid)
+                if len(parts) >= 7 and parts[5] == "delay" and parts[6].isdigit():
+                    context.user_data[("auto2_params", gid)] = {"kind": "announce", "delay": int(parts[6]), "interval": None}
+                    return await auto2_prompt_text(update, context, gid, key="announce")
+                if len(parts) >= 7 and parts[5] == "interval" and parts[6].isdigit():
+                    context.user_data[("auto2_params", gid)] = {"kind": "announce", "delay": 5, "interval": int(parts[6])}
+                    return await auto2_prompt_text(update, context, gid, key="announce")
+            if step == "pin":
+                if len(parts) == 5:
+                    return await auto2_pick_interval(update, context, gid)
+                if len(parts) >= 7 and parts[5] == "interval" and parts[6].isdigit():
+                    context.user_data[("auto2_params", gid)] = {"kind": "rotate_pin", "delay": 5, "interval": int(parts[6])}
+                    return await update.effective_message.reply_text(t(_panel_lang(update, gid), "panel.auto.pin_prompt_text"))
+
         if len(parts) >= 6 and parts[3] == "antispam" and parts[4] == "preset":
             preset = parts[5]
             presets = {
@@ -319,6 +396,13 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 async with db.SessionLocal() as s:  # type: ignore
                     cfg = await SettingsRepo(s).get(gid, "onboarding") or {"require_accept": False}
                     cfg["require_accept"] = not bool(cfg.get("require_accept", False))
+                    await SettingsRepo(s).set(gid, "onboarding", cfg)
+                    await s.commit()
+                return await show_onboarding(update, context, gid)
+            if parts[4] == "require_unmute":
+                async with db.SessionLocal() as s:  # type: ignore
+                    cfg = await SettingsRepo(s).get(gid, "onboarding") or {"require_accept_unmute": False}
+                    cfg["require_accept_unmute"] = not bool(cfg.get("require_accept_unmute", False))
                     await SettingsRepo(s).set(gid, "onboarding", cfg)
                     await s.commit()
                 return await show_onboarding(update, context, gid)
@@ -441,6 +525,17 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                         await s.commit()
                     return await show_links(update, context, gid)
         if len(parts) >= 5 and parts[3] == "auto":
+            if parts[4] == "toggle" and len(parts) >= 6:
+                job_id = int(parts[5])
+                async with db.SessionLocal() as s:  # type: ignore
+                    from ...infra.repos import JobsRepo
+                    j = await JobsRepo(s).get(job_id)
+                    if j and j.group_id == gid:
+                        payload = j.payload or {}
+                        payload["paused"] = not bool(payload.get("paused"))
+                        await JobsRepo(s).update_payload(job_id, payload)
+                        await s.commit()
+                return await show_automations(update, context, gid)
             if parts[4] == "add":
                 # choose once or repeat and delay/interval
                 kb = [
@@ -450,7 +545,9 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     ],
                     [InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:automations")],
                 ]
-                return await update.effective_message.edit_text(t(lang, "panel.auto.pick_mode"), reply_markup=InlineKeyboardMarkup(kb))
+                await _safe_edit(update, context, key=f"auto:pick_mode:{gid}", text=t(lang, "panel.auto.pick_mode"), kb_rows=kb)
+                return
+
             if parts[4] == "add" and len(parts) >= 6 and parts[5] == "pin":
                 kb = [
                     [
@@ -460,7 +557,9 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     ],
                     [InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:automations")],
                 ]
-                return await update.effective_message.edit_text(t(lang, "panel.auto.pin_pick_interval"), reply_markup=InlineKeyboardMarkup(kb))
+                await _safe_edit(update, context, key=f"auto:pin_interval:{gid}", text=t(lang, "panel.auto.pin_pick_interval"), kb_rows=kb)
+                return
+
             if parts[4] == "add" and len(parts) >= 6 and parts[5] in {"unmute", "unban"}:
                 mode = parts[5]
                 kb = [
@@ -471,7 +570,9 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     ],
                     [InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:automations")],
                 ]
-                return await update.effective_message.edit_text(t(lang, "panel.auto.pick_delay"), reply_markup=InlineKeyboardMarkup(kb))
+                await _safe_edit(update, context, key=f"auto:{mode}:pick_delay:{gid}", text=t(lang, "panel.auto.pick_delay"), kb_rows=kb)
+                return
+
             if parts[4] == "add" and len(parts) >= 6 and parts[5] in {"once", "repeat"}:
                 mode = parts[5]
                 # choose delay or interval presets
@@ -484,7 +585,9 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                         ],
                         [InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:automations")],
                     ]
-                    return await update.effective_message.edit_text(t(lang, "panel.auto.pick_delay"), reply_markup=InlineKeyboardMarkup(kb))
+                    await _safe_edit(update, context, key=f"auto:once:pick_delay:{gid}", text=t(lang, "panel.auto.pick_delay"), kb_rows=kb)
+                    return
+
                 else:
                     kb = [
                         [
@@ -494,24 +597,50 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                         ],
                         [InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:automations")],
                     ]
-                    return await update.effective_message.edit_text(t(lang, "panel.auto.pick_interval"), reply_markup=InlineKeyboardMarkup(kb))
+                    await _safe_edit(update, context, key=f"auto:pick_interval:{gid}", text=t(lang, "panel.auto.pick_interval"), kb_rows=kb)
+                    return
+
             if parts[4] == "add" and len(parts) >= 8 and parts[5] == "once" and parts[6] == "delay":
                 delay = int(parts[7])
                 context.user_data[("await_auto_announce", gid)] = {"delay": delay, "interval": None}
-                return await update.effective_message.reply_text(t(lang, "panel.auto.prompt_text"))
+                
+                try:
+                    return await update.effective_message.reply_text(t(lang, "panel.auto.prompt_text"))
+                except Exception as e:
+                    log.exception("automation panel: prompt text send failed gid=%s: %s", gid, e)
+                    return
+
             if parts[4] == "add" and len(parts) >= 8 and parts[5] == "repeat" and parts[6] == "interval":
                 interval = int(parts[7])
                 context.user_data[("await_auto_announce", gid)] = {"delay": 5, "interval": interval}
-                return await update.effective_message.reply_text(t(lang, "panel.auto.prompt_text"))
+                
+                try:
+                    return await update.effective_message.reply_text(t(lang, "panel.auto.prompt_text"))
+                except Exception as e:
+                    log.exception("automation panel: prompt text send failed gid=%s: %s", gid, e)
+                    return
+
             if parts[4] == "add" and len(parts) >= 8 and parts[5] == "pin" and parts[6] == "interval":
                 interval = int(parts[7])
                 context.user_data[("await_auto_pintext", gid)] = {"interval": interval}
-                return await update.effective_message.reply_text(t(lang, "panel.auto.pin_prompt_text"))
+                
+                try:
+                    return await update.effective_message.reply_text(t(lang, "panel.auto.pin_prompt_text"))
+                except Exception as e:
+                    log.exception("automation panel: pin prompt send failed gid=%s: %s", gid, e)
+                    return
+
             if parts[4] == "add" and len(parts) >= 8 and parts[5] in {"unmute", "unban"} and parts[6] == "delay":
                 delay = int(parts[7])
                 mode = parts[5]
                 context.user_data[(f"await_auto_{mode}_uid", gid)] = {"delay": delay}
-                return await update.effective_message.reply_text(t(lang, "panel.auto.prompt_uid"))
+                
+                try:
+                    return await update.effective_message.reply_text(t(lang, "panel.auto.prompt_uid"))
+                except Exception as e:
+                    log.exception("automation panel: prompt uid send failed gid=%s: %s", gid, e)
+                    return
+
             if parts[4] == "cancel" and len(parts) >= 6:
                 job_id = int(parts[5])
                 # remove from DB and job_queue
@@ -565,7 +694,10 @@ async def on_rules_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
     # Find any pending group assignment
     # Save rules text
-    for (k, gid), payload in list(context.user_data.items()):
+    for key, payload in list(context.user_data.items()):
+        if not isinstance(key, tuple) or len(key) != 2:
+            continue
+        k, gid = key
         if k == "await_rules" and payload:
             async with db.SessionLocal() as s:  # type: ignore
                 await SettingsRepo(s).set_text(gid, "rules", update.effective_message.text or "")
@@ -612,6 +744,7 @@ async def on_rules_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 lang = I18N.pick_lang(update)
                 await update.effective_message.reply_text(t(lang, "rules.add.ok", id=f.id))
                 context.user_data[(k, gid)] = False
+                context.user_data.pop(("auto2_params", gid), None)
                 return
         if k == "await_welcome" and payload:
             async with db.SessionLocal() as s:  # type: ignore
@@ -673,6 +806,82 @@ async def on_rules_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await update.effective_message.reply_text(t(lang, "panel.saved"))
             context.user_data[(k, gid)] = False
             return
+        if k == "await_auto2_text" and isinstance(payload, dict):
+            params = context.user_data.get(("auto2_params", gid)) or {}
+            kind = params.get("kind")
+            # Capture any message type for announcement: use copy_message
+            src_chat = update.effective_chat.id
+            src_mid = update.effective_message.message_id
+            dval = params.get("delay")
+            delay = int(dval) if dval is not None else 5
+            interval = params.get("interval")
+            log.debug(f"Processing auto2_text for gid={gid}, params={params}")
+            if kind == "announce":
+                # If this is part of a media group (album), accumulate and finalize after short delay
+                mgid = getattr(update.effective_message, "media_group_id", None)
+                log.debug(f"Media group check for gid={gid}: mgid={mgid}")
+                if mgid:
+                    # Use bot_data instead of user_data for job access
+                    items_key = f"auto2_album:{gid}:{mgid}"
+                    if not hasattr(context, 'bot_data'):
+                        context.bot_data = {}
+                    lst = context.bot_data.get(items_key)
+                    if not isinstance(lst, list):
+                        lst = []
+                        context.bot_data[items_key] = lst
+                    m = update.effective_message
+                    item = None
+                    if getattr(m, "photo", None):
+                        item = {"type": "photo", "file_id": m.photo[-1].file_id, "caption": m.caption or None}
+                    elif getattr(m, "video", None):
+                        item = {"type": "video", "file_id": m.video.file_id, "caption": m.caption or None}
+                    elif getattr(m, "document", None):
+                        item = {"type": "document", "file_id": m.document.file_id, "caption": m.caption or None}
+                    elif getattr(m, "audio", None):
+                        item = {"type": "audio", "file_id": m.audio.file_id, "caption": m.caption or None}
+                    if item:
+                        lst.append(item)
+                        log.debug(f"Added media item to album gid={gid} mgid={mgid}: {item['type']}, total items: {len(lst)}")
+                    jobname = f"auto2_album:{gid}:{mgid}"
+                    jobs = context.job_queue.get_jobs_by_name(jobname)
+                    if not jobs:
+                        log.info(f"Scheduling album finalization for gid={gid} mgid={mgid} in 1.2s")
+                        # Store data references that will be updated as more items arrive
+                        job_data = {
+                            "gid": gid, 
+                            "mgid": mgid,
+                            "items_key": items_key,  # Pass the key to retrieve items later
+                            "params": params.copy() if params else {},
+                            "panel_ref": context.user_data.get(("auto2_panel", gid), {})
+                        }
+                        context.job_queue.run_once(_auto2_finalize_album, when=1.2, name=jobname, data=job_data)
+                    else:
+                        log.debug(f"Job already scheduled for album {mgid}, items now: {len(lst)}")
+                    # Don't clear params here - they're needed by finalization job
+                    return
+                from .handlers import _panel_lang
+                jid = await _auto2_schedule_announce(context, gid, "", delay, interval, copy={"chat_id": src_chat, "message_id": src_mid}, notify={"chat_id": update.effective_chat.id})
+                # Update the panel message back to Automations menu (edit in place)
+                panel_ref = context.user_data.get(("auto2_panel", gid)) or {}
+                try:
+                    if isinstance(panel_ref, dict) and panel_ref.get("chat_id") and panel_ref.get("message_id"):
+                        lang2 = _panel_lang(update, gid)
+                        kb = [
+                            [InlineKeyboardButton(t(lang2, "panel.auto.add_announce"), callback_data=f"panel:group:{gid}:auto2:announce")],
+                            [InlineKeyboardButton(t(lang2, "panel.auto.add_pin"), callback_data=f"panel:group:{gid}:auto2:pin")],
+                            [
+                                InlineKeyboardButton(t(lang2, "panel.auto.add_unmute"), callback_data=f"panel:group:{gid}:auto2:unmute"),
+                                InlineKeyboardButton(t(lang2, "panel.auto.add_unban"), callback_data=f"panel:group:{gid}:auto2:unban"),
+                            ],
+                            [InlineKeyboardButton(t(lang2, "panel.back"), callback_data=f"panel:group:{gid}:tab:automations")],
+                        ]
+                        await _safe_edit_msg(context, panel_ref["chat_id"], panel_ref["message_id"], key=f"auto2:menu:{gid}", text=t(lang2, "panel.auto.title"), kb_rows=kb)
+                except BadRequest:
+                    pass
+                context.user_data[(k, gid)] = False
+                context.user_data.pop(("auto2_params", gid), None)
+                context.user_data.pop(("auto2_panel", gid), None)
+                return
         if k == "await_auto_pintext" and isinstance(payload, dict):
             text = update.effective_message.text or ""
             interval = int(payload.get("interval", 3600))
@@ -731,7 +940,7 @@ async def on_rules_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def show_language(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
-    lang = I18N.pick_lang(update)
+    lang = _panel_lang(update, gid)
     from ...core.i18n import I18N as _I
 
     current = _I.get_group_lang(gid) or "default"
@@ -746,7 +955,7 @@ async def show_language(update: Update, context: ContextTypes.DEFAULT_TYPE, gid:
 
 
 async def show_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
-    lang = I18N.pick_lang(update)
+    lang = _panel_lang(update, gid)
     async with db.SessionLocal() as s:  # type: ignore
         cfg = await SettingsRepo(s).get(gid, "welcome") or {"enabled": True}
     enabled = bool(cfg.get("enabled", True))
@@ -774,18 +983,21 @@ async def show_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: 
 
 
 async def show_onboarding(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
-    lang = I18N.pick_lang(update)
+    lang = _panel_lang(update, gid)
     async with db.SessionLocal() as s:  # type: ignore
         auto = await SettingsRepo(s).get(gid, "auto_approve_join") or {"enabled": False}
         ob = await SettingsRepo(s).get(gid, "onboarding") or {"require_accept": False}
         cap = await SettingsRepo(s).get(gid, "captcha") or {"enabled": False, "mode": "button", "timeout": 120}
     label = t(lang, "panel.onboarding.title") + "\n" + t(
         lang, "panel.onboarding.auto", state="ON" if auto.get("enabled") else "OFF"
-    ) + "\n" + t(lang, "panel.onboarding.require", state="ON" if ob.get("require_accept") else "OFF") + "\n" + t(lang, "panel.onboarding.captcha", state="ON" if cap.get("enabled") else "OFF") + f"\nMode: {cap.get('mode')} | Timeout: {cap.get('timeout')}s"
+    ) + "\n" + t(lang, "panel.onboarding.require", state="ON" if ob.get("require_accept") else "OFF") + "\n" + t(
+        lang, "panel.onboarding.require_unmute", state="ON" if ob.get("require_accept_unmute") else "OFF"
+    ) + "\n" + t(lang, "panel.onboarding.captcha", state="ON" if cap.get("enabled") else "OFF") + f"\nMode: {cap.get('mode')} | Timeout: {cap.get('timeout')}s"
     kb = [
         [InlineKeyboardButton(t(lang, "panel.toggle"), callback_data=f"panel:group:{gid}:onboarding:toggle")],
         [InlineKeyboardButton(t(lang, "panel.onboarding.toggle_require"), callback_data=f"panel:group:{gid}:onboarding:require")],
         [InlineKeyboardButton(t(lang, "panel.onboarding.captcha_toggle"), callback_data=f"panel:group:{gid}:onboarding:captcha:toggle")],
+        [InlineKeyboardButton(t(lang, "panel.onboarding.toggle_unmute"), callback_data=f"panel:group:{gid}:onboarding:require_unmute")],
         [InlineKeyboardButton(t(lang, "panel.rules.edittext"), callback_data=f"panel:group:{gid}:rules:edittext")],
         [
             InlineKeyboardButton("button", callback_data=f"panel:group:{gid}:onboarding:captcha:mode:button"),
@@ -829,7 +1041,7 @@ async def show_moderation(update: Update, context: ContextTypes.DEFAULT_TYPE, gi
 
 
 async def show_links(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
-    lang = I18N.pick_lang(update)
+    lang = _panel_lang(update, gid)
     async with db.SessionLocal() as s:  # type: ignore
         cfg = await SettingsRepo(s).get(gid, "links") or {"block_all": False, "denylist": [], "action": "delete"}
         night = await SettingsRepo(s).get(gid, "links.night") or {"enabled": False, "from_h": 0, "to_h": 6, "tz_offset_min": 0, "block_all": True}
@@ -865,7 +1077,7 @@ async def show_links(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: in
 
 
 async def show_links_type_actions(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
-    lang = I18N.pick_lang(update)
+    lang = _panel_lang(update, gid)
     async with db.SessionLocal() as s:  # type: ignore
         cfg = await SettingsRepo(s).get(gid, "links") or {"types": {}}
     types = cfg.get("types", {})
@@ -892,7 +1104,7 @@ async def show_links_type_actions(update: Update, context: ContextTypes.DEFAULT_
 
 
 async def show_links_night(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
-    lang = I18N.pick_lang(update)
+    lang = _panel_lang(update, gid)
     async with db.SessionLocal() as s:  # type: ignore
         night = await SettingsRepo(s).get(gid, "links.night") or {"enabled": False, "from_h": 0, "to_h": 6, "tz_offset_min": 0, "block_all": True}
     enabled = bool(night.get("enabled"))
@@ -915,7 +1127,7 @@ async def show_links_night(update: Update, context: ContextTypes.DEFAULT_TYPE, g
 
 
 async def show_locks(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
-    lang = I18N.pick_lang(update)
+    lang = _panel_lang(update, gid)
     async with db.SessionLocal() as s:  # type: ignore
         locks = await SettingsRepo(s).get(gid, "locks") or {}
     forwards = locks.get("forwards", "allow")
@@ -992,16 +1204,18 @@ async def apply_quick_action(update: Update, context: ContextTypes.DEFAULT_TYPE,
         until = int(time.time()) + int(cfg["mute_seconds"])
         try:
             await context.bot.restrict_chat_member(gid, uid, permissions=ChatPermissions(can_send_messages=False), until_date=until)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception("quick mute failed gid=%s uid=%s: %s", gid, uid, e)
         await update.effective_message.reply_text(t(lang, "mod.muted"))
         return
     if act == "ban":
         until = int(time.time()) + int(cfg["ban_seconds"])
         try:
             await context.bot.ban_chat_member(gid, uid, until_date=until)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception("quick ban failed gid=%s uid=%s: %s", gid, uid, e)
         await update.effective_message.reply_text(t(lang, "mod.banned"))
         return
 
@@ -1026,33 +1240,236 @@ async def rule_config(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: i
 
 
 async def show_automations(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
-    lang = I18N.pick_lang(update)
+    from datetime import timezone
+    lang = _panel_lang(update, gid)
     async with db.SessionLocal() as s:  # type: ignore
         from ...infra.repos import JobsRepo
-
         jobs = await JobsRepo(s).list_by_group(gid, limit=50)
-    rows = [
-        [InlineKeyboardButton(t(lang, "panel.auto.add_announce"), callback_data=f"panel:group:{gid}:auto:add")],
-        [InlineKeyboardButton(t(lang, "panel.auto.add_pin"), callback_data=f"panel:group:{gid}:auto:add:pin")],
-        [
-            InlineKeyboardButton(t(lang, "panel.auto.add_unmute"), callback_data=f"panel:group:{gid}:auto:add:unmute"),
-            InlineKeyboardButton(t(lang, "panel.auto.add_unban"), callback_data=f"panel:group:{gid}:auto:add:unban"),
-        ],
-    ]
+    rows: list[list[InlineKeyboardButton]] = []
+    rows.append([InlineKeyboardButton(t(lang, "panel.auto.add_announce"), callback_data=f"panel:group:{gid}:auto2:announce")])
+    rows.append([InlineKeyboardButton(t(lang, "panel.auto.add_pin"), callback_data=f"panel:group:{gid}:auto2:pin")])
+    rows.append([
+        InlineKeyboardButton(t(lang, "panel.auto.add_unmute"), callback_data=f"panel:group:{gid}:auto2:unmute"),
+        InlineKeyboardButton(t(lang, "panel.auto.add_unban"), callback_data=f"panel:group:{gid}:auto2:unban"),
+    ])
     for j in jobs[:10]:
-        label = f"#{j.id} {j.kind} next: {j.run_at.isoformat()}"
-        rows.append(
-            [
-                InlineKeyboardButton(label, callback_data="panel:noop"),
-                InlineKeyboardButton("✖", callback_data=f"panel:group:{gid}:auto:cancel:{j.id}"),
-            ]
-        )
+        next_label = j.run_at.replace(tzinfo=timezone.utc).isoformat()
+        paused = bool(isinstance(j.payload, dict) and j.payload.get("paused"))
+        label = f"#{j.id} {j.kind}{' ⏸' if paused else ''} • next: {next_label}"
+        rows.append([
+            InlineKeyboardButton(label, callback_data="panel:noop"),
+            InlineKeyboardButton("⏯" if paused else "⏸", callback_data=f"panel:group:{gid}:auto:toggle:{j.id}"),
+            InlineKeyboardButton("✖", callback_data=f"panel:group:{gid}:auto:cancel:{j.id}"),
+        ])
     rows.append([InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:home")])
     await update.effective_message.edit_text(t(lang, "panel.auto.title"), reply_markup=InlineKeyboardMarkup(rows))
 
 
+# ----- Automations v2 (wizard) -----
+def _aw(ctx: ContextTypes.DEFAULT_TYPE, gid: int) -> dict:
+    key = ("auto2", gid)
+    w = ctx.user_data.get(key)
+    if not isinstance(w, dict):
+        w = {}
+        ctx.user_data[key] = w
+    return w
+
+
+async def auto2_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
+    lang = _panel_lang(update, gid)
+    kb = [
+        [InlineKeyboardButton(t(lang, "panel.auto.add_announce"), callback_data=f"panel:group:{gid}:auto2:announce")],
+        [InlineKeyboardButton(t(lang, "panel.auto.add_pin"), callback_data=f"panel:group:{gid}:auto2:pin")],
+        [
+            InlineKeyboardButton(t(lang, "panel.auto.add_unmute"), callback_data=f"panel:group:{gid}:auto2:unmute"),
+            InlineKeyboardButton(t(lang, "panel.auto.add_unban"), callback_data=f"panel:group:{gid}:auto2:unban"),
+        ],
+        [InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:automations")],
+    ]
+    await _safe_edit(update, context, key=f"auto2:menu:{gid}", text=t(lang, "panel.auto.title"), kb_rows=kb)
+
+
+async def auto2_pick_announce_mode(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
+    lang = _panel_lang(update, gid)
+    w = _aw(context, gid)
+    w.clear(); w.update({"kind": "announce"})
+    kb = [[
+        InlineKeyboardButton(t(lang, "panel.auto.once"), callback_data=f"panel:group:{gid}:auto2:announce:once"),
+        InlineKeyboardButton(t(lang, "panel.auto.repeat"), callback_data=f"panel:group:{gid}:auto2:announce:repeat"),
+    ], [InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:auto2:menu")]]
+    await _safe_edit(update, context, key=f"auto2:announce:mode:{gid}", text=t(lang, "panel.auto.pick_mode"), kb_rows=kb)
+
+
+async def auto2_pick_delay(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int, key: str) -> None:
+    lang = _panel_lang(update, gid)
+    kb = [[
+        InlineKeyboardButton("Now", callback_data=f"panel:group:{gid}:auto2:{key}:delay:0"),
+        InlineKeyboardButton("10m", callback_data=f"panel:group:{gid}:auto2:{key}:delay:600"),
+        InlineKeyboardButton("1h", callback_data=f"panel:group:{gid}:auto2:{key}:delay:3600"),
+        InlineKeyboardButton("1d", callback_data=f"panel:group:{gid}:auto2:{key}:delay:86400"),
+    ], [InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:auto2:menu")]]
+    await _safe_edit(update, context, key=f"auto2:{key}:pick_delay:{gid}", text=t(lang, "panel.auto.pick_delay"), kb_rows=kb)
+
+
+async def auto2_pick_interval(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
+    lang = _panel_lang(update, gid)
+    kb = [[
+        InlineKeyboardButton("1h", callback_data=f"panel:group:{gid}:auto2:announce:interval:3600"),
+        InlineKeyboardButton("6h", callback_data=f"panel:group:{gid}:auto2:announce:interval:21600"),
+        InlineKeyboardButton("1d", callback_data=f"panel:group:{gid}:auto2:announce:interval:86400"),
+    ], [InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:auto2:menu")]]
+    await _safe_edit(update, context, key=f"auto2:announce:pick_interval:{gid}", text=t(lang, "panel.auto.pick_interval"), kb_rows=kb)
+
+
+
+
+async def _auto2_finalize_album(context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Initialize variables outside try block
+    gid = None
+    mgid = None
+    items = []
+    params = {}
+    panel_ref = {}
+    delay = 5
+    interval = None
+    items_key = None
+    meta_key = None
+    panel_key = None
+    
+    try:
+        if context.job is None:
+            log.error("context.job is None in _auto2_finalize_album")
+            return
+        data = context.job.data if context.job and context.job.data else {}
+        gid = data.get("gid") if data else None
+        mgid = data.get("mgid") if data else None
+        
+        log.info(f"Finalizing album for gid={gid} mgid={mgid}, job data keys: {list(data.keys())}")
+        if gid is None or mgid is None:
+            log.error(f"Missing gid or mgid: gid={gid}, mgid={mgid}")
+            return
+            
+        # Set up keys
+        items_key = data.get("items_key") or f"auto2_album:{gid}:{mgid}"
+        meta_key = ("auto2_params", gid)
+        panel_key = ("auto2_panel", gid)
+        
+        # Try to get items from bot_data using the key
+        items = []
+        if hasattr(context, 'bot_data') and context.bot_data and items_key:
+            items = context.bot_data.get(items_key, [])
+            log.info(f"Retrieved {len(items)} items from bot_data with key {items_key}")
+        
+        # Fallback to job data if no items found
+        if not items:
+            items = data.get("items", [])
+            log.info(f"Using {len(items)} items from job data (fallback)")
+            
+        params = data.get("params", {})
+        panel_ref = data.get("panel_ref", {})
+        if not items:
+            log.warning(f"No items found for album gid={gid} mgid={mgid}")
+            return
+        # Schedule album as announce
+        delay = int(params.get("delay") if params else 5) if params else 5
+        interval = params.get("interval") if params else None
+    except Exception as e:
+        log.error(f"Error in _auto2_finalize_album at params processing: {e}")
+        # Use defaults if error occurred
+        delay = 5
+        interval = None
+    # Compute lang for panel edit
+    try:
+        from ...core.i18n import I18N as _I
+        lang = _I.get_group_lang(gid) or 'en'
+    except Exception:
+        lang = 'en'
+    # Build album media payload
+    album_media = items  # list of dicts with type, file_id, caption
+    from .handlers import _panel_lang
+    notify = None
+    try:
+        if panel_ref and isinstance(panel_ref, dict) and panel_ref.get("chat_id"):
+            notify = {"chat_id": panel_ref.get("chat_id")}
+    except Exception as e:
+        log.error(f"Error getting notify from panel_ref: {e}, panel_ref: {panel_ref}")
+        notify = None
+    log.info(f"Scheduling album announcement for gid={gid} with {len(album_media)} items, delay={delay}, interval={interval}")
+    await _auto2_schedule_announce(context, gid, '', delay, interval, copy=None, notify=notify, album_media=album_media)
+    # Edit panel back to menu if we have ref
+    try:
+        log.info(f"Attempting to edit panel back to menu. panel_ref: {panel_ref}")
+        if panel_ref and isinstance(panel_ref, dict) and panel_ref.get("chat_id") and panel_ref.get("message_id"):
+            kb = [
+                [InlineKeyboardButton(t(lang, "panel.auto.add_announce"), callback_data=f"panel:group:{gid}:auto2:announce")],
+                [InlineKeyboardButton(t(lang, "panel.auto.add_pin"), callback_data=f"panel:group:{gid}:auto2:pin")],
+                [
+                    InlineKeyboardButton(t(lang, "panel.auto.add_unmute"), callback_data=f"panel:group:{gid}:auto2:unmute"),
+                    InlineKeyboardButton(t(lang, "panel.auto.add_unban"), callback_data=f"panel:group:{gid}:auto2:unban"),
+                ],
+                [InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:automations")],
+            ]
+            await _safe_edit_msg(context, panel_ref["chat_id"], panel_ref["message_id"], key=f"auto2:menu:{gid}", text=t(lang, "panel.auto.title"), kb_rows=kb)
+            log.info(f"Successfully edited panel back to automations menu for gid={gid}")
+        else:
+            log.warning(f"Could not edit panel - missing data. chat_id: {panel_ref.get('chat_id') if panel_ref else None}, message_id: {panel_ref.get('message_id') if panel_ref else None}")
+    except Exception as e:
+        log.error(f"Error editing panel back to menu: {e}")
+    # Cleanup
+    try:
+        # Clean up bot_data
+        if hasattr(context, 'bot_data') and context.bot_data and items_key:
+            context.bot_data.pop(items_key, None)
+            log.info(f"Cleaned up bot_data key: {items_key}")
+            
+        # Clean up user_data if available
+        if context.user_data:
+            if gid is not None:
+                context.user_data.pop(("await_auto2_text", gid), None)
+            if meta_key:
+                context.user_data.pop(meta_key, None)
+            if panel_key:
+                context.user_data.pop(panel_key, None)
+    except Exception as e:
+        log.error(f"Error during cleanup in _auto2_finalize_album: {e}")
+async def auto2_prompt_text(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int, key: str) -> None:
+    lang = _panel_lang(update, gid)
+    context.user_data[("await_auto2_text", gid)] = {"key": key}
+    # Remember the panel message to edit later after content is received
+    context.user_data[("auto2_panel", gid)] = {"chat_id": update.effective_chat.id, "message_id": update.effective_message.message_id}
+    await _safe_edit(update, context, key=f"auto2:{key}:prompt:{gid}", text=t(lang, "panel.auto.prompt_text"), kb_rows=[[InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:auto2:menu")]])
+
+
+async def _auto2_schedule_announce(context: ContextTypes.DEFAULT_TYPE, gid: int, text: str, delay: int, interval: int | None, copy: dict | None = None, album_media: list | None = None, notify: dict | None = None) -> int:
+    from datetime import datetime, timedelta
+    from ...infra.repos import JobsRepo
+    from ...features.automations.handlers import run_job, job_name
+    run_at = datetime.utcnow() + timedelta(seconds=delay)
+    payload: dict = {}
+    if copy:
+        payload["copy"] = copy
+    elif text:
+        payload["text"] = text
+    if notify:
+        payload["notify"] = notify
+    if album_media:
+        payload["album_media"] = album_media
+    async with db.SessionLocal() as s:  # type: ignore
+        j = await JobsRepo(s).add(gid, "announce", payload, run_at, interval)
+        await s.commit()
+    if interval:
+        # Use a minimal 1s delay to allow payload updates (e.g., copy source)
+        first = delay if (delay is not None and delay > 0) else 1
+        context.job_queue.run_repeating(run_job, interval=interval, first=first, name=job_name(j.id), data={"job_id": j.id})
+    else:
+        # Use a minimal 1s delay to allow payload updates before first run
+        when = delay if (delay is not None and delay > 0) else 1
+        context.job_queue.run_once(run_job, when=when, name=job_name(j.id), data={"job_id": j.id})
+    return j.id
+
+
 async def show_audit(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int, page: int) -> None:
-    lang = I18N.pick_lang(update)
+    lang = _panel_lang(update, gid)
     page_size = 10
     async with db.SessionLocal() as s:  # type: ignore
         from sqlalchemy import select, desc
@@ -1092,4 +1509,5 @@ async def show_onboarding(update: Update, context: ContextTypes.DEFAULT_TYPE, gi
 
 def register_callbacks(app):
     app.add_handler(CallbackQueryHandler(on_callback, pattern=r"^panel:"))
-    app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.PRIVATE, on_rules_input))
+    # Accept any private message (not commands) for wizards (rules/automations)
+    app.add_handler(MessageHandler(filters.ChatType.PRIVATE & ~filters.COMMAND, on_rules_input))
