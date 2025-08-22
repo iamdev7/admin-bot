@@ -111,3 +111,15 @@ class Job(Base):
     payload: Mapped[dict] = mapped_column(JSON)
     run_at: Mapped[datetime] = mapped_column(DateTime)
     interval_sec: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+
+class GlobalViolator(Base):
+    __tablename__ = "global_violators"
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    violation_count: Mapped[int] = mapped_column(Integer, default=1)
+    first_violation: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_violation: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    matched_words: Mapped[list] = mapped_column(JSON, default=list)  # Track which words they violated
+    action: Mapped[str] = mapped_column(String(32))  # warn, mute, ban
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # When penalty expires
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Admin notes

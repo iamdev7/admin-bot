@@ -73,6 +73,7 @@ class UsersRepo:
                     first_name=first_name,
                     last_name=last_name,
                     language=language,
+                    seen_at=datetime.utcnow(),  # Explicitly set seen_at for new users
                 )
             )
         else:
@@ -80,7 +81,7 @@ class UsersRepo:
             u.first_name = first_name
             u.last_name = last_name
             u.language = language
-            u.seen_at = datetime.utcnow()
+            u.seen_at = datetime.utcnow()  # Update seen_at for existing users
 
 
 class AuditRepo:

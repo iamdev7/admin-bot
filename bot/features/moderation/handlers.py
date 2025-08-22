@@ -8,8 +8,8 @@ from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 import logging
 
-from ...core.permissions import require_admin
-from ...core.utils import parse_duration
+from ...core.permissions import require_group_admin
+from ...core.utils import parse_duration, group_default_permissions
 from ...core.i18n import I18N, t
 from ...infra import db
 from ...infra.repos import AuditRepo, WarnsRepo
@@ -25,7 +25,7 @@ def _target_user_id(update: Update) -> Optional[int]:
     return None
 
 
-@require_admin
+@require_group_admin
 async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = I18N.pick_lang(update)
     target_id = _target_user_id(update)
@@ -61,7 +61,7 @@ async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.effective_message.reply_text(t(lang, "mod.warned_count", count=count))
 
 
-@require_admin
+@require_group_admin
 async def unwarn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = I18N.pick_lang(update)
     target_id = _target_user_id(update)
@@ -75,7 +75,7 @@ async def unwarn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text(t(lang, "mod.unwarned" if ok else "mod.unwarned_none"))
 
 
-@require_admin
+@require_group_admin
 async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = I18N.pick_lang(update)
     target_id = _target_user_id(update)
@@ -104,18 +104,15 @@ async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text(t(lang, "mod.muted"))
 
 
-@require_admin
+@require_group_admin
 async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = I18N.pick_lang(update)
     target_id = _target_user_id(update)
     if not target_id:
         return await update.effective_message.reply_text(t(lang, "mod.reply_to_target"))
     try:
-        await context.bot.restrict_chat_member(
-            update.effective_chat.id,
-            target_id,
-            permissions=ChatPermissions(can_send_messages=True),
-        )
+        perms = await group_default_permissions(context, update.effective_chat.id)
+        await context.bot.restrict_chat_member(update.effective_chat.id, target_id, permissions=perms)
     except Exception as e:
         log.exception("moderation unmute failed gid=%s uid=%s: %s", update.effective_chat.id, target_id, e)
     async with db.SessionLocal() as s:  # type: ignore
@@ -124,7 +121,7 @@ async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text(t(lang, "mod.unmuted"))
 
 
-@require_admin
+@require_group_admin
 async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = I18N.pick_lang(update)
     target_id = _target_user_id(update)
@@ -148,7 +145,7 @@ async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text(t(lang, "mod.banned"))
 
 
-@require_admin
+@require_group_admin
 async def unban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = I18N.pick_lang(update)
     target_id = _target_user_id(update)
@@ -164,7 +161,7 @@ async def unban(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text(t(lang, "mod.unbanned"))
 
 
-@require_admin
+@require_group_admin
 async def purge(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = I18N.pick_lang(update)
     count = int(context.args[0]) if context.args else 10

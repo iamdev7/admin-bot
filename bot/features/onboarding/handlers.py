@@ -9,6 +9,7 @@ from ...infra import db
 from ...infra.settings_repo import SettingsRepo
 from ...core.permissions import require_admin
 from ...core.i18n import I18N, t
+from ...core.utils import group_default_permissions
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +50,13 @@ async def on_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
         try:
             await context.bot.send_message(req.from_user.id, text, reply_markup=kb)
+            # Mark that we sent rules to avoid duplication when user clicks deep-link
+            recent_messages_key = f"rules_sent_{gid}_{req.from_user.id}"
+            context.user_data[recent_messages_key] = True
+            # Clear flag after some time
+            async def clear_flag(ctx: ContextTypes.DEFAULT_TYPE):
+                ctx.user_data.pop(recent_messages_key, None)
+            context.job_queue.run_once(clear_flag, when=300)  # Clear after 5 minutes
         except Exception as e:
             log.exception("Failed to DM rules for pre-approval gid=%s uid=%s: %s", gid, req.from_user.id, e)
             # Can't DM; leave pending until the user starts the bot
@@ -73,6 +81,13 @@ async def on_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 [[InlineKeyboardButton(t(lang_code, "join.accept"), callback_data=f"rules:accept:{gid}:{req.from_user.id}")]]
             )
             await context.bot.send_message(req.from_user.id, text, reply_markup=kb_dm)
+            # Mark that we sent rules to avoid duplication when user clicks deep-link
+            recent_messages_key = f"rules_sent_{gid}_{req.from_user.id}"
+            context.user_data[recent_messages_key] = True
+            # Clear flag after some time
+            async def clear_flag(ctx: ContextTypes.DEFAULT_TYPE):
+                ctx.user_data.pop(recent_messages_key, None)
+            context.job_queue.run_once(clear_flag, when=300)  # Clear after 5 minutes
         except Exception as e:
             log.exception("Failed to DM rules after auto-approve gid=%s uid=%s: %s", gid, req.from_user.id, e)
         # Approve the join
@@ -198,7 +213,13 @@ async def on_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             await context.bot.decline_chat_join_request(gid, uid)
         except Exception as e:
             log.exception("Failed to decline join gid=%s uid=%s: %s", gid, uid, e)
-        await update.effective_message.reply_text("❌")
+        # Remove the buttons from the message
+        try:
+            await update.effective_message.edit_reply_markup(None)
+        except Exception as e:
+            log.exception("Failed to remove buttons after decline gid=%s uid=%s: %s", gid, uid, e)
+        lang = I18N.pick_lang(update)
+        await update.effective_message.reply_text(t(lang, "join.declined"))
 
 
 async def on_rules_accept(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -213,9 +234,10 @@ async def on_rules_accept(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     uid = int(uid_s)
     if not update.effective_user or update.effective_user.id != uid:
         return
-    # Unmute first
+    # Unmute first (restore group default permissions)
     try:
-        await context.bot.restrict_chat_member(gid, uid, permissions=ChatPermissions(can_send_messages=True))
+        perms = await group_default_permissions(context, gid)
+        await context.bot.restrict_chat_member(gid, uid, permissions=perms)
     except Exception as e:
         log.exception("Failed to unmute on rules accept gid=%s uid=%s: %s", gid, uid, e)
     # Replace only the buttons on the original rules message; keep rules visible
@@ -250,8 +272,30 @@ async def on_rules_accept(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.effective_message.edit_reply_markup(return_kb)
     except Exception as e:
         log.exception("Failed to edit reply markup (rules accept) gid=%s uid=%s: %s", gid, uid, e)
-    # Send a separate thank-you message below
-    try:
-        await update.effective_message.reply_text(t(lang, "rules.accepted"))
-    except Exception as e:
-        log.exception("Failed to send thank-you (rules accept) gid=%s uid=%s: %s", gid, uid, e)
+    # Check if there's a reminder message to edit, otherwise send new thank-you
+    reminder_msg_key = f"reminder_msg_{gid}_{uid}"
+    reminder_msg_id = context.user_data.get(reminder_msg_key)
+    
+    if reminder_msg_id:
+        # Edit the reminder message instead of sending a new one
+        try:
+            await context.bot.edit_message_text(
+                chat_id=update.effective_chat.id,
+                message_id=reminder_msg_id,
+                text=t(lang, "rules.accepted")
+            )
+            # Clean up the stored message ID
+            context.user_data.pop(reminder_msg_key, None)
+        except Exception as e:
+            log.exception("Failed to edit reminder message, sending new one: %s", e)
+            # Fall back to sending new message if edit fails
+            try:
+                await update.effective_message.reply_text(t(lang, "rules.accepted"))
+            except Exception as e2:
+                log.exception("Failed to send thank-you (rules accept) gid=%s uid=%s: %s", gid, uid, e2)
+    else:
+        # No reminder message, send new thank-you message
+        try:
+            await update.effective_message.reply_text(t(lang, "rules.accepted"))
+        except Exception as e:
+            log.exception("Failed to send thank-you (rules accept) gid=%s uid=%s: %s", gid, uid, e)

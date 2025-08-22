@@ -2,6 +2,12 @@ from __future__ import annotations
 
 import re
 from datetime import timedelta
+from typing import Any
+
+from telegram import ChatPermissions
+import logging
+
+log = logging.getLogger(__name__)
 
 
 _DUR_RE = re.compile(r"^(?P<num>\d+)(?P<unit>[smhd])$", re.IGNORECASE)
@@ -28,3 +34,27 @@ def parse_duration(spec: str | None) -> timedelta | None:
         return timedelta(days=num)
     raise ValueError("Invalid duration unit")
 
+
+async def group_default_permissions(context: Any, chat_id: int) -> ChatPermissions:
+    """Fetch the chat's default member permissions and use them to unrestrict users.
+
+    Falls back to allowing basic messages if defaults are unavailable.
+    """
+    try:
+        chat = await context.bot.get_chat(chat_id)
+        perms = getattr(chat, "permissions", None)
+        if isinstance(perms, ChatPermissions):
+            return perms
+    except Exception as e:
+        log.error("Failed to get chat permissions for chat_id=%s: %s", chat_id, e)
+    # Minimal safe fallback: allow sending messages; other capabilities follow group defaults.
+    try:
+        return ChatPermissions(can_send_messages=True)
+    except Exception:
+        # Last resort (API differences): construct empty then set attribute
+        p = ChatPermissions()
+        try:
+            setattr(p, "can_send_messages", True)
+        except Exception as e:
+            log.error("Failed to set can_send_messages attribute: %s", e)
+        return p

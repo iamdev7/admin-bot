@@ -61,3 +61,34 @@ def require_admin(func: Callable[[Update, ContextTypes.DEFAULT_TYPE], Awaitable[
         # silently ignore non-admins
     return wrapper
 
+
+def require_group_admin(func: Callable[[Update, ContextTypes.DEFAULT_TYPE], Awaitable[None]]):
+    """Decorator that ensures the command is used in a group and by an admin."""
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        chat = update.effective_chat
+        user = update.effective_user
+        if not chat or not user:
+            return
+        
+        # Only work in groups, not in private chats
+        if chat.type == "private":
+            return
+        
+        # Check admin status
+        if is_owner(user.id):
+            return await func(update, context)
+        
+        cached = await _admin_cache.get(chat.id, user.id)
+        is_admin = False if cached is None else cached
+        if cached is None:
+            member = await context.bot.get_chat_member(chat.id, user.id)
+            is_admin = member.status in (
+                ChatMemberStatus.ADMINISTRATOR,
+                ChatMemberStatus.OWNER,
+            )
+            await _admin_cache.set(chat.id, user.id, is_admin)
+        if is_admin:
+            return await func(update, context)
+        # silently ignore non-admins
+    return wrapper
+

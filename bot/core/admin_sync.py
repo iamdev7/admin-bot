@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from telegram import ChatMemberUpdated, Update
 from telegram.constants import ChatMemberStatus
-from telegram.ext import Application, ChatMemberHandler, ContextTypes
+from telegram.ext import Application, ChatMemberHandler, ContextTypes, MessageHandler, CallbackQueryHandler, filters
 import logging
 
 from .i18n import I18N
@@ -40,8 +40,10 @@ def register(app: Application) -> None:
     # Seed/refresh snapshot when the bot itself is added to a chat
     app.add_handler(ChatMemberHandler(on_my_chat_member, chat_member_types=ChatMemberHandler.MY_CHAT_MEMBER))
     # On group messages, ensure group exists and seed admins if new
-    from telegram.ext import MessageHandler, filters
     app.add_handler(MessageHandler(filters.ChatType.GROUPS, on_group_message), group=1)
+    # Track users on any message (private or groups) and on callbacks
+    app.add_handler(MessageHandler(~filters.StatusUpdate.ALL, on_any_message), group=0)
+    app.add_handler(CallbackQueryHandler(on_any_callback), group=0)
 
 
 async def on_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -106,4 +108,38 @@ async def on_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 await admins_repo.upsert_admin(chat.id, cm.user.id, str(cm.status), rights={})
             except Exception as e:
                 log.exception("admin_sync upsert_admin (msg) failed gid=%s uid=%s: %s", chat.id, cm.user.id, e)
+        await s.commit()
+
+
+async def on_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Upsert users on any incoming message (private or groups)."""
+    if not update.effective_user:
+        return
+    u = update.effective_user
+    async with db.SessionLocal() as s:  # type: ignore
+        from ..infra.repos import UsersRepo
+        await UsersRepo(s).upsert_user(
+            uid=u.id,
+            username=getattr(u, "username", None),
+            first_name=getattr(u, "first_name", None),
+            last_name=getattr(u, "last_name", None),
+            language=(u.language_code or None),
+        )
+        await s.commit()
+
+
+async def on_any_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Upsert users on any callback query interaction."""
+    if not update.effective_user:
+        return
+    u = update.effective_user
+    async with db.SessionLocal() as s:  # type: ignore
+        from ..infra.repos import UsersRepo
+        await UsersRepo(s).upsert_user(
+            uid=u.id,
+            username=getattr(u, "username", None),
+            first_name=getattr(u, "first_name", None),
+            last_name=getattr(u, "last_name", None),
+            language=(u.language_code or None),
+        )
         await s.commit()

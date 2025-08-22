@@ -30,6 +30,7 @@ Modular, extensible Telegram group‑management bot using python‑telegram‑bo
 ## Commands
 - Public: `/start`, `/help`, `/rules`
 - Admin (groups): `/settings`, `/setrules <text>`, `/joinapprove on|off`
+- Owner-only (DM): `/bot` (opens Bot Admin panel)
 - Moderation: `/warn`, `/mute <dur>`, `/unmute`, `/ban <dur>`, `/unban`, `/unwarn`, `/purge <N>`
 - Forums: `/topic_close`, `/topic_open`, `/topic_rename <name>`, `/topic_pin` (reply)
 - Content rules (CLI alternative): `/addrule <word|regex> <delete|warn|mute|ban> <pattern>`, `/listrules`, `/delrule <id>`
@@ -42,8 +43,14 @@ Modular, extensible Telegram group‑management bot using python‑telegram‑bo
   - Language: per‑group EN/AR override.
   - Onboarding: auto‑approve toggle; require rules acceptance (DM accept before join); Captcha (button/math, timeout).
   - Automations: announcements (once/repeat), rotate pin, timed unmute/unban.
-  - Moderation: warn‑limit, delete‑offense toggle, ephemeral replies (off/10s/30s), Recent Violators with quick actions.
-  - Audit: recent moderation events (paged).
+- Moderation: warn‑limit, delete‑offense toggle, ephemeral replies (off/10s/30s), Recent Violators with quick actions.
+- Audit: recent moderation events (paged).
+
+## Bot Admin (Owners)
+- Open in DM: `/bot` (owners from `OWNER_IDS` in `.env`).
+- Broadcast: send any message type (text/media/albums) to all groups, all tracked users, or a specific chat ID (copy_message / media albums supported). Confirmation step shows target count.
+- Statistics: totals for groups, users, active automations, and violations.
+- Global blacklist: manage words and global action (warn/mute/ban) that applies across all groups; export/import config as JSON.
 
 ## Service (optional)
 Run as a systemd service on Linux (edit paths):

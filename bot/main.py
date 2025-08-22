@@ -25,6 +25,7 @@ import logging
 log = logging.getLogger(__name__)
 from .core.logging import setup_logging
 from .core.errors import register_error_handler
+from .core.user_tracker import register_user_tracking
 from .infra.db import init_engine, init_sessionmaker
 from .infra.migrate import migrate
 from .features.moderation import register as register_moderation
@@ -38,6 +39,8 @@ from .core.admin_sync import register as register_admin_sync
 from .features.onboarding import register as register_onboarding
 from .features.verification import register as register_verification
 from .features.topics import register as register_topics
+from .features.bot_admin import register as register_bot_admin
+from .features.global_enforcement import register as register_global_enforcement
 
 
 async def on_startup(app: Application) -> None:
@@ -69,9 +72,16 @@ def make_app() -> Application:
         .build()
     )
 
+    # Register user tracking first (highest priority)
+    register_user_tracking(app)
+    
+    # Register global enforcement early (before other handlers)
+    register_global_enforcement(app)
+    
     # Basic commands
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_))
+    
 
     # Feature registrations
     register_moderation(app)
@@ -80,13 +90,14 @@ def make_app() -> Application:
     register_rules(app)
     register_automations(app)
     register_admin_panel(app)
+    register_bot_admin(app)  # Register bot admin commands for owner
     register_admin_sync(app)
     register_onboarding(app)
     register_verification(app)
     register_topics(app)
 
-    # Events & callbacks
-    async def _noop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Events & callbacks - catch unhandled callbacks to prevent errors
+    async def _noop(_: Update, __: ContextTypes.DEFAULT_TYPE) -> None:
         return None
     app.add_handler(CallbackQueryHandler(_noop), group=10)
 
@@ -136,6 +147,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 gid = None
 
     if gid is not None:
+            # Check if we already sent rules in the last few messages
+            # This prevents duplicate messages when user clicks "Read & Accept Rules" button
+            recent_messages_key = f"rules_sent_{gid}_{update.effective_user.id if update.effective_user else 0}"
+            if context.user_data.get(recent_messages_key):
+                # Rules were already sent, don't duplicate - just remind them to click Accept above
+                lang = I18N.pick_lang(update)
+                reminder_msg = await update.effective_message.reply_text(t(lang, "rules.already_sent"))
+                # Store message ID so we can edit it later when user accepts
+                context.user_data[f"reminder_msg_{gid}_{update.effective_user.id}"] = reminder_msg.message_id
+                return
+            
             from .infra import db
             from .infra.settings_repo import SettingsRepo
             rules_text = None
@@ -164,12 +186,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             uid = update.effective_user.id if update.effective_user else 0
             kb = InlineKeyboardMarkup([[InlineKeyboardButton(t(lang, "join.accept"), callback_data=f"rules:accept:{gid}:{uid}")]])
             await update.effective_message.reply_text(txt, reply_markup=kb)
+            
+            # Mark that we sent rules to avoid duplication
+            context.user_data[recent_messages_key] = True
+            # Clear flag after some time
+            async def clear_flag(ctx: ContextTypes.DEFAULT_TYPE):
+                ctx.user_data.pop(recent_messages_key, None)
+            context.job_queue.run_once(clear_flag, when=300)  # Clear after 5 minutes
+            
             return
     text = t(lang, "start.welcome", first_name=update.effective_user.first_name or "")
     await update.effective_message.reply_text(text, parse_mode=ParseMode.HTML)
 
 
-async def help_(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def help_(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     lang = I18N.pick_lang(update, fallback=settings.DEFAULT_LANG)
     await update.effective_message.reply_text(t(lang, "help.text"))
 
@@ -179,6 +209,9 @@ async def main() -> None:
     from pathlib import Path
 
     Path("data").mkdir(exist_ok=True)
+    
+    # Log startup info
+    log.info(f"Bot starting with {len(settings.OWNER_IDS)} owner(s) configured")
 
     await init_engine(settings.DATABASE_URL)
     init_sessionmaker()
@@ -197,8 +230,6 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    import sys
-    
     # Ensure data directory exists for SQLite path
     from pathlib import Path
     Path("data").mkdir(exist_ok=True)

@@ -3,18 +3,21 @@ from __future__ import annotations
 import time
 from collections import deque, defaultdict
 from datetime import timedelta
-from typing import Deque, Dict, Tuple
+from typing import Deque, Dict, Tuple, Optional
 from urllib.parse import urlparse
+import logging
 
 from telegram import ChatPermissions, Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
 from ...core.i18n import I18N, t
 from ...core.ephemeral import reply_ephemeral
-from ...core.permissions import require_admin
+from ...core.permissions import require_group_admin
 from ...infra import db
 from ...infra.repos import AuditRepo, FiltersRepo
 from ...infra.settings_repo import SettingsRepo
+
+log = logging.getLogger(__name__)
 
 
 DEFAULTS = {
@@ -35,9 +38,17 @@ def _store(context: ContextTypes.DEFAULT_TYPE) -> Dict[Tuple[int, int], Deque[fl
 async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.effective_chat or not update.effective_user:
         return
+    
+    # Only enforce antispam in groups, not in private chats
+    if update.effective_chat.type == "private":
+        return
+    
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
-    # Links policy enforcement first, then content rules
+    # Global blacklist, links policy, then content rules
+    gb = await enforce_global_blacklist(update, context)
+    if gb:
+        return
     link_handled = await enforce_link_policy(update, context)
     if link_handled:
         return
@@ -86,6 +97,151 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             dq.clear()
 
 
+def _msg_text(update: Update) -> str:
+    """Return message text, falling back to caption when present."""
+    if not update.effective_message:
+        return ""
+    msg = update.effective_message
+    txt = getattr(msg, "text", None)
+    if txt:
+        return txt
+    cap = getattr(msg, "caption", None)
+    return cap or ""
+
+
+async def get_global_blacklist() -> dict:
+    async with db.SessionLocal() as s:  # type: ignore
+        from ...infra.settings_repo import SettingsRepo as SR
+
+        cfg = await SR(s).get(0, "global_blacklist") or {"words": [], "action": None}
+    return cfg
+
+
+async def apply_global_penalty(
+    context: ContextTypes.DEFAULT_TYPE,
+    user_id: int,
+    action: str,
+    matched_word: str,
+    duration: Optional[int] = None
+) -> None:
+    """Apply penalty to user across ALL groups where bot is admin."""
+    # Get all groups from database
+    async with db.SessionLocal() as s:  # type: ignore
+        from sqlalchemy import select
+        from ...infra.models import Group
+        
+        result = await s.execute(select(Group))
+        groups = result.scalars().all()
+    
+    applied_count = 0
+    for group in groups:
+        try:
+            if action == "mute" and duration:
+                until = int(time.time()) + duration
+                await context.bot.restrict_chat_member(
+                    group.id,
+                    user_id,
+                    permissions=ChatPermissions(can_send_messages=False),
+                    until_date=until
+                )
+                applied_count += 1
+            elif action == "ban" and duration:
+                until = int(time.time()) + duration
+                await context.bot.ban_chat_member(
+                    group.id,
+                    user_id,
+                    until_date=until
+                )
+                applied_count += 1
+        except Exception as e:
+            # User might not be in this group or bot might not have perms
+            log.debug(f"Could not apply {action} to user {user_id} in group {group.id}: {e}")
+    
+    if applied_count > 0:
+        log.info(f"Applied global {action} to user {user_id} in {applied_count} groups for violating: {matched_word}")
+
+
+async def enforce_global_blacklist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    if not update.effective_chat or not update.effective_message or not update.effective_user:
+        return False
+    
+    # Only enforce in groups, not in private chats
+    if update.effective_chat.type == "private":
+        return False
+    
+    text = _msg_text(update)
+    if not text:
+        return False
+    cfg = await get_global_blacklist()
+    words = [w.strip().lower() for w in cfg.get("words", []) if isinstance(w, str)]
+    if not words:
+        return False
+    lowered = text.lower()
+    matched = next((w for w in words if w and w in lowered), None)
+    if not matched:
+        return False
+    action = (cfg.get("action") or "warn").lower()
+    lang = I18N.pick_lang(update)
+    gid = update.effective_chat.id
+    uid = update.effective_user.id
+    
+    # Track this user as a global violator
+    async with db.SessionLocal() as s:  # type: ignore
+        from ...infra.global_violators_repo import GlobalViolatorsRepo
+        cfg2 = await get_antispam_config(gid)
+        
+        # Determine duration based on action
+        duration = None
+        if action == "mute":
+            duration = int(cfg2["mute_seconds"])
+        elif action == "ban":
+            duration = int(cfg2["ban_seconds"])
+        
+        # Record the violation globally
+        await GlobalViolatorsRepo(s).add_violation(
+            user_id=uid,
+            matched_word=matched,
+            action=action,
+            duration_seconds=duration
+        )
+        await s.commit()
+    
+    # Delete offending message first when taking action
+    try:
+        await context.bot.delete_message(gid, update.effective_message.message_id)
+    except Exception:
+        pass
+    
+    # Apply the penalty in current group
+    if action == "warn":
+        await context.bot.send_message(gid, t(lang, "content.warn"))
+        await handle_warn_escalation(gid, uid, update, context)
+        
+        # Apply warn to ALL groups where user is member
+        await apply_global_penalty(context, uid, "warn", matched)
+        return True
+    
+    if action == "mute":
+        until = int(time.time()) + int(cfg2["mute_seconds"])
+        await context.bot.restrict_chat_member(gid, uid, permissions=ChatPermissions(can_send_messages=False), until_date=until)
+        await context.bot.send_message(gid, t(lang, "content.muted"))
+        
+        # Apply mute to ALL groups where user is member
+        await apply_global_penalty(context, uid, "mute", matched, duration)
+        return True
+    
+    if action == "ban":
+        until = int(time.time()) + int(cfg2["ban_seconds"])
+        await context.bot.ban_chat_member(gid, uid, until_date=until)
+        await context.bot.send_message(gid, t(lang, "content.banned"))
+        
+        # Apply ban to ALL groups where user is member
+        await apply_global_penalty(context, uid, "ban", matched, duration)
+        return True
+    
+    return True
+
+
 def register_handlers(app: Application) -> None:
     app.add_handler(MessageHandler(~filters.COMMAND & ~filters.StatusUpdate.ALL, on_any), group=15)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text), group=20)
@@ -102,8 +258,13 @@ async def get_antispam_config(group_id: int) -> dict:
 async def enforce_content_rules(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     if not update.effective_chat or not update.effective_message or not update.effective_user:
         return False
+    
+    # Only enforce in groups, not in private chats
+    if update.effective_chat.type == "private":
+        return False
+    
     gid = update.effective_chat.id
-    text = update.effective_message.text or ""
+    text = _msg_text(update)
     if not text:
         return False
     async with db.SessionLocal() as s:  # type: ignore
@@ -209,7 +370,12 @@ def _extract_urls(text: str) -> list[str]:
 async def enforce_link_policy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     if not update.effective_message or not update.effective_chat or not update.effective_user:
         return False
-    text = update.effective_message.text or ""
+    
+    # Only enforce in groups, not in private chats
+    if update.effective_chat.type == "private":
+        return False
+    
+    text = _msg_text(update)
     urls = _extract_urls(text)
     if not urls:
         return False
@@ -338,11 +504,24 @@ def is_night(cfg: dict) -> bool:
 
 
 async def on_any(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Forward/media locks for any message
+    # Forward/media locks and caption/text enforcement for any message
     if not update.effective_chat or not update.effective_user or not update.effective_message:
         return
+    
+    # Only enforce locks in groups, not in private chats
+    if update.effective_chat.type == "private":
+        return
+    
     gid = update.effective_chat.id
     msg = update.effective_message
+    # If message has a caption (media + text), process blacklist/links/rules first
+    if getattr(msg, "caption", None):
+        if await enforce_global_blacklist(update, context):
+            return
+        if await enforce_link_policy(update, context):
+            return
+        if await enforce_content_rules(update, context):
+            return
     # Forwards
     if getattr(msg, "forward_date", None) or getattr(msg, "forward_origin", None):
         action = await get_lock_action(gid, "forwards")
@@ -502,7 +681,7 @@ async def handle_warn_escalation(gid: int, uid: int, update: Update, context: Co
             await s.commit()
 
 
-@require_admin
+@require_group_admin
 async def add_rule_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = I18N.pick_lang(update)
     msg = update.effective_message
@@ -521,7 +700,7 @@ async def add_rule_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await msg.reply_text(t(lang, "rules.add.ok", id=f.id))
 
 
-@require_admin
+@require_group_admin
 async def list_rules_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = I18N.pick_lang(update)
     msg = update.effective_message
@@ -536,7 +715,7 @@ async def list_rules_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await msg.reply_text(text)
 
 
-@require_admin
+@require_group_admin
 async def del_rule_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = I18N.pick_lang(update)
     msg = update.effective_message

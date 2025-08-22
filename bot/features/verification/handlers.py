@@ -9,6 +9,7 @@ from telegram.ext import ContextTypes
 import logging
 
 from ...core.i18n import I18N, t
+from ...core.utils import group_default_permissions
 from ...infra import db
 from ...infra.settings_repo import SettingsRepo
 log = logging.getLogger(__name__)
@@ -96,9 +97,10 @@ async def on_captcha_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not pending:
         return
     if typ == "ok" or (typ == "math" and len(data) == 5 and pending.answer == int(data[4])):
-        # Verified
+        # Verified — restore group default permissions
         try:
-            await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=True))
+            perms = await group_default_permissions(context, chat_id)
+            await context.bot.restrict_chat_member(chat_id, user_id, permissions=perms)
         except Exception as e:
             log.exception("verify: unrestrict failed gid=%s uid=%s: %s", chat_id, user_id, e)
         try:

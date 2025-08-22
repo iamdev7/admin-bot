@@ -121,11 +121,9 @@ async def run_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             uid = j.payload.get("user_id")
             if uid:
                 try:
-                    from telegram import ChatPermissions
-
-                    await context.bot.restrict_chat_member(
-                        j.group_id, uid, permissions=ChatPermissions(can_send_messages=True)
-                    )
+                    from ...core.utils import group_default_permissions
+                    perms = await group_default_permissions(context, j.group_id)
+                    await context.bot.restrict_chat_member(j.group_id, uid, permissions=perms)
                 except Exception as e:
                     log.exception("automation.timed_unmute failed id=%s: %s", j.id, e)
         elif j.kind == "timed_unban":
