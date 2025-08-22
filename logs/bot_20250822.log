@@ -77,3 +77,206 @@ Traceback (most recent call last):
   File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/request/_baserequest.py", line 374, in _request_wrapper
     raise exception
 telegram.error.Conflict: Conflict: terminated by other getUpdates request; make sure that only one bot instance is running
+2025-08-22 10:57:11 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 10:57:11 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 10:57:11 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-22 10:57:11 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-22 10:57:11 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-22 10:57:12 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-22 10:58:07 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 10:58:07 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 10:58:07 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-22 10:58:07 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-22 10:58:07 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-22 10:58:08 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-22 10:59:08 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-22 10:59:08 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250822_085908.db
+2025-08-22 10:59:08 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250822_085908.db.gz (compressed 95.4%, 68.0 KB → 3.1 KB)
+2025-08-22 10:59:08 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-22 10:59:08 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-22 10:59:08 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-22 11:06:17 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 11:06:17 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 11:06:17 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-22 11:06:17 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-22 11:06:17 [INFO] bot.core.private_handler (private_handler.py:165) - Private message handler registered
+2025-08-22 11:06:17 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-22 11:06:17 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-22 11:06:23 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 11:06:23 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 11:06:23 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-22 11:06:23 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-22 11:06:23 [INFO] bot.core.private_handler (private_handler.py:165) - Private message handler registered
+2025-08-22 11:06:23 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-22 11:06:24 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-22 11:06:24 [ERROR] bot.core.error_handler (error_handler.py:51) - Exception while handling an update:
+Traceback (most recent call last):
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_utils/networkloop.py", line 115, in network_retry_loop
+    if not await do_action():
+           ^^^^^^^^^^^^^^^^^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_utils/networkloop.py", line 108, in do_action
+    return action_cb_task.result()
+           ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_updater.py", line 340, in polling_action_cb
+    updates = await self.bot.get_updates(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_extbot.py", line 670, in get_updates
+    updates = await super().get_updates(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<9 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_bot.py", line 4611, in get_updates
+    await self._post(
+    ^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    ),
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_bot.py", line 698, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_extbot.py", line 370, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_bot.py", line 727, in _do_post
+    result = await request.post(
+             ^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/request/_baserequest.py", line 197, in post
+    result = await self._request_wrapper(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/request/_baserequest.py", line 374, in _request_wrapper
+    raise exception
+telegram.error.Conflict: Conflict: terminated by other getUpdates request; make sure that only one bot instance is running
+2025-08-22 11:06:54 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 11:06:54 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 11:06:54 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-22 11:06:54 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-22 11:06:54 [INFO] bot.core.private_handler (private_handler.py:165) - Private message handler registered
+2025-08-22 11:06:54 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-22 11:06:55 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-22 11:07:55 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-22 11:07:55 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250822_090755.db
+2025-08-22 11:07:55 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250822_090755.db.gz (compressed 95.4%, 68.0 KB → 3.1 KB)
+2025-08-22 11:07:55 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-22 11:07:55 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-22 11:07:55 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-22 11:11:13 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 11:11:13 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 11:11:13 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-22 11:11:13 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-22 11:11:13 [INFO] bot.core.private_handler (private_handler.py:165) - Private message handler registered
+2025-08-22 11:11:13 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-22 11:11:13 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-22 11:11:13 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-22 11:11:14 [ERROR] bot.core.error_handler (error_handler.py:51) - Exception while handling an update:
+Traceback (most recent call last):
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_utils/networkloop.py", line 115, in network_retry_loop
+    if not await do_action():
+           ^^^^^^^^^^^^^^^^^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_utils/networkloop.py", line 108, in do_action
+    return action_cb_task.result()
+           ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_updater.py", line 340, in polling_action_cb
+    updates = await self.bot.get_updates(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_extbot.py", line 670, in get_updates
+    updates = await super().get_updates(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<9 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_bot.py", line 4611, in get_updates
+    await self._post(
+    ^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    ),
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_bot.py", line 698, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_extbot.py", line 370, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_bot.py", line 727, in _do_post
+    result = await request.post(
+             ^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/request/_baserequest.py", line 197, in post
+    result = await self._request_wrapper(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/request/_baserequest.py", line 374, in _request_wrapper
+    raise exception
+telegram.error.Conflict: Conflict: terminated by other getUpdates request; make sure that only one bot instance is running
+2025-08-22 11:19:54 [ERROR] bot.core.admin_sync (admin_sync.py:104) - admin_sync get_chat_administrators (msg) failed gid=-2071339607493: Member list is inaccessible
+Traceback (most recent call last):
+  File "/home/altmemy/projecrts/python project/admin-bot/bot/core/admin_sync.py", line 102, in on_group_message
+    admins = await context.bot.get_chat_administrators(chat.id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_extbot.py", line 1834, in get_chat_administrators
+    return await super().get_chat_administrators(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_bot.py", line 4898, in get_chat_administrators
+    result = await self._post(
+             ^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_bot.py", line 698, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_extbot.py", line 370, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_bot.py", line 727, in _do_post
+    result = await request.post(
+             ^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/request/_baserequest.py", line 197, in post
+    result = await self._request_wrapper(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/request/_baserequest.py", line 374, in _request_wrapper
+    raise exception
+telegram.error.BadRequest: Member list is inaccessible

@@ -24,6 +24,8 @@ from .core.i18n import I18N, t
 from .core.logging_config import setup_logging, get_logger
 from .core.error_handler import setup_error_handlers
 from .core.backup import schedule_backups, manual_backup_command
+from .core.private_handler import register_private_handler, help_command as new_help_command
+from .core.command_handler import register_command_handlers
 
 log = get_logger(__name__)
 from .core.user_tracker import register_user_tracking
@@ -83,10 +85,16 @@ def make_app() -> Application:
     
     # Basic commands
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_))
+    app.add_handler(CommandHandler("help", new_help_command))
     
     # Admin backup command
     app.add_handler(CommandHandler("backup", manual_backup_command))
+    
+    # Register private message handler
+    register_private_handler(app)
+    
+    # Register command handlers (for unknown commands and permission checks)
+    register_command_handlers(app)
 
     # Feature registrations
     register_moderation(app)
@@ -200,13 +208,56 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             context.job_queue.run_once(clear_flag, when=300)  # Clear after 5 minutes
             
             return
-    text = t(lang, "start.welcome", first_name=update.effective_user.first_name or "")
-    await update.effective_message.reply_text(text, parse_mode=ParseMode.HTML)
+    
+    # Check if we're in private chat
+    if update.effective_chat and update.effective_chat.type == "private":
+        # Show the professional welcome message for private users
+        bot_name = t(lang, "bot.name")
+        text = t(lang, "start.private.welcome", bot_name=bot_name)
+        
+        # Add buttons for channel and panel
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        keyboard = [
+            [InlineKeyboardButton(t(lang, "bot.button.updates"), url="https://t.me/codei8")],
+            [InlineKeyboardButton(t(lang, "bot.button.manage"), callback_data="panel:back")]
+        ]
+        markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.effective_message.reply_text(
+            text, 
+            parse_mode=ParseMode.HTML,
+            reply_markup=markup,
+            disable_web_page_preview=True
+        )
+    else:
+        # In group, show simple welcome
+        text = t(lang, "start.welcome", first_name=update.effective_user.first_name or "")
+        await update.effective_message.reply_text(text, parse_mode=ParseMode.HTML)
 
 
 async def help_(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     lang = I18N.pick_lang(update, fallback=settings.DEFAULT_LANG)
-    await update.effective_message.reply_text(t(lang, "help.text"))
+    
+    # Show detailed help in private, simple in groups
+    if update.effective_chat and update.effective_chat.type == "private":
+        text = t(lang, "help.private")
+        
+        # Add buttons
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        keyboard = [
+            [InlineKeyboardButton(t(lang, "bot.button.updates"), url="https://t.me/codei8")],
+            [InlineKeyboardButton(t(lang, "bot.button.manage"), callback_data="panel:back")]
+        ]
+        markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.effective_message.reply_text(
+            text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=markup,
+            disable_web_page_preview=True
+        )
+    else:
+        await update.effective_message.reply_text(t(lang, "help.text"))
 
 
 async def main() -> None:
