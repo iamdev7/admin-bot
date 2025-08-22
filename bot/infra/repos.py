@@ -64,19 +64,38 @@ class UsersRepo:
         last_name: Optional[str],
         language: Optional[str],
     ) -> None:
+        from sqlalchemy.exc import IntegrityError
+        
+        # Try to get existing user first
         u = await self.s.get(User, uid)
         if u is None:
-            self.s.add(
-                User(
-                    id=uid,
-                    username=username,
-                    first_name=first_name,
-                    last_name=last_name,
-                    language=language,
-                    seen_at=datetime.utcnow(),  # Explicitly set seen_at for new users
+            # User doesn't exist, try to create
+            try:
+                self.s.add(
+                    User(
+                        id=uid,
+                        username=username,
+                        first_name=first_name,
+                        last_name=last_name,
+                        language=language,
+                        seen_at=datetime.utcnow(),  # Explicitly set seen_at for new users
+                    )
                 )
-            )
+                # Flush to catch IntegrityError before commit
+                await self.s.flush()
+            except IntegrityError:
+                # Another request already created the user, rollback and fetch it
+                await self.s.rollback()
+                u = await self.s.get(User, uid)
+                if u:
+                    # Update the existing user
+                    u.username = username
+                    u.first_name = first_name
+                    u.last_name = last_name
+                    u.language = language
+                    u.seen_at = datetime.utcnow()
         else:
+            # User exists, update it
             u.username = username
             u.first_name = first_name
             u.last_name = last_name

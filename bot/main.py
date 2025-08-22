@@ -132,7 +132,215 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if len(parts) == 2:
             param = parts[1]
     gid: int | None = None
+    join_action = None  # Track if this is a join request action
+    join_gid = None
+    join_uid = None
+    
     if param:
+        # Check for join request deep links first
+        import base64
+        if len(param) > 0 and not param.startswith("rules"):
+            # Try to decode as base64 join request
+            try:
+                pad = '=' * (-len(param) % 4)
+                decoded = base64.urlsafe_b64decode(param + pad).decode()
+                if decoded.startswith("join_accept_") or decoded.startswith("join_decline_"):
+                    parts = decoded.split("_")
+                    if len(parts) == 4:
+                        join_action = parts[1]  # "accept" or "decline"
+                        join_gid = int(parts[2])
+                        join_uid = int(parts[3])
+                        # Process join request action
+                        if update.effective_user and update.effective_user.id == join_uid:
+                            # Delete the /start message immediately
+                            try:
+                                await update.effective_message.delete()
+                            except Exception:
+                                pass  # Ignore if deletion fails
+                            
+                            if join_action == "accept":
+                                try:
+                                    await context.bot.approve_chat_join_request(join_gid, join_uid)
+                                    
+                                    # Try to edit the original rules message
+                                    original_msg_id = context.application.user_data.get(join_uid, {}).get(f"join_rules_msg_{join_gid}")
+                                    
+                                    if original_msg_id:
+                                        # Get the original message text to keep it
+                                        from .infra import db
+                                        from .infra.settings_repo import SettingsRepo
+                                        rules_text = None
+                                        group_title = str(join_gid)
+                                        async with db.SessionLocal() as s:  # type: ignore
+                                            rules_text = await SettingsRepo(s).get_text(join_gid, "rules")
+                                            try:
+                                                from .infra.models import Group
+                                                g = await s.get(Group, join_gid)
+                                                if g and g.title:
+                                                    group_title = g.title
+                                            except Exception:
+                                                pass
+                                        try:
+                                            chat = await context.bot.get_chat(join_gid)
+                                            if chat and chat.title:
+                                                group_title = chat.title
+                                        except Exception:
+                                            pass
+                                        
+                                        header = t(lang, "rules.dm.header")
+                                        txt = header + "\n\n" + t(lang, "join.dm.rules", group_title=group_title, rules=rules_text or t(lang, "rules.default"))
+                                        txt += f"\n\n✅ {t(lang, 'rules.accepted')}"
+                                        
+                                        # Add return button if group has username
+                                        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                                        return_kb = None
+                                        try:
+                                            chat = await context.bot.get_chat(join_gid)
+                                            if getattr(chat, "username", None):
+                                                url = f"https://t.me/{chat.username}"
+                                                return_kb = InlineKeyboardMarkup(
+                                                    [[InlineKeyboardButton(t(lang, "rules.return_group"), url=url)]]
+                                                )
+                                        except Exception:
+                                            return_kb = None
+                                        
+                                        # Edit the original message - remove buttons and add acceptance note
+                                        try:
+                                            await context.bot.edit_message_text(
+                                                chat_id=update.effective_chat.id,
+                                                message_id=original_msg_id,
+                                                text=txt,
+                                                reply_markup=return_kb
+                                            )
+                                        except Exception as e:
+                                            log.warning(f"Could not edit original message: {e}")
+                                            # Fallback: send a brief success message that auto-deletes
+                                            success_msg = await context.bot.send_message(
+                                                chat_id=update.effective_chat.id,
+                                                text="✅ " + t(lang, 'rules.accepted')
+                                            )
+                                            async def delete_success(ctx):
+                                                try:
+                                                    await ctx.bot.delete_message(update.effective_chat.id, success_msg.message_id)
+                                                except Exception:
+                                                    pass
+                                            context.job_queue.run_once(delete_success, when=3)
+                                    else:
+                                        # No stored message ID, just send brief confirmation
+                                        success_msg = await context.bot.send_message(
+                                            chat_id=update.effective_chat.id,
+                                            text="✅ " + t(lang, 'rules.accepted')
+                                        )
+                                        async def delete_success(ctx):
+                                            try:
+                                                await ctx.bot.delete_message(update.effective_chat.id, success_msg.message_id)
+                                            except Exception:
+                                                pass
+                                        context.job_queue.run_once(delete_success, when=3)
+                                    
+                                    log.info(f"Approved join request via deep link for user {join_uid} in group {join_gid}")
+                                except Exception as e:
+                                    log.exception("Failed to approve join request via deep link gid=%s uid=%s: %s", join_gid, join_uid, e)
+                                    error_msg = await context.bot.send_message(
+                                        chat_id=update.effective_chat.id,
+                                        text=t(lang, "join.error")
+                                    )
+                                    # Delete error message after 5 seconds
+                                    async def delete_error(ctx):
+                                        try:
+                                            await ctx.bot.delete_message(update.effective_chat.id, error_msg.message_id)
+                                        except Exception:
+                                            pass
+                                    context.job_queue.run_once(delete_error, when=5)
+                            elif join_action == "decline":
+                                try:
+                                    await context.bot.decline_chat_join_request(join_gid, join_uid)
+                                    
+                                    # Try to edit the original rules message
+                                    original_msg_id = context.application.user_data.get(join_uid, {}).get(f"join_rules_msg_{join_gid}")
+                                    
+                                    if original_msg_id:
+                                        # Edit the original message to show decline status
+                                        try:
+                                            # Get group title for the message
+                                            group_title = str(join_gid)
+                                            try:
+                                                chat = await context.bot.get_chat(join_gid)
+                                                if chat and chat.title:
+                                                    group_title = chat.title
+                                            except Exception:
+                                                pass
+                                            
+                                            txt = f"❌ {t(lang, 'join.declined_message')}\n\n"
+                                            txt += t(lang, "join.declined_group", group_title=group_title)
+                                            
+                                            await context.bot.edit_message_text(
+                                                chat_id=update.effective_chat.id,
+                                                message_id=original_msg_id,
+                                                text=txt,
+                                                reply_markup=None  # Remove all buttons
+                                            )
+                                        except Exception as e:
+                                            log.warning(f"Could not edit original message for decline: {e}")
+                                            # Fallback: send decline message that auto-deletes
+                                            decline_msg = await context.bot.send_message(
+                                                chat_id=update.effective_chat.id,
+                                                text="❌ " + t(lang, "join.declined_message")
+                                            )
+                                            async def delete_decline(ctx):
+                                                try:
+                                                    await ctx.bot.delete_message(update.effective_chat.id, decline_msg.message_id)
+                                                except Exception:
+                                                    pass
+                                            context.job_queue.run_once(delete_decline, when=3)
+                                    else:
+                                        # No stored message ID, send brief decline message
+                                        decline_msg = await context.bot.send_message(
+                                            chat_id=update.effective_chat.id,
+                                            text="❌ " + t(lang, "join.declined_message")
+                                        )
+                                        async def delete_decline(ctx):
+                                            try:
+                                                await ctx.bot.delete_message(update.effective_chat.id, decline_msg.message_id)
+                                            except Exception:
+                                                pass
+                                        context.job_queue.run_once(delete_decline, when=3)
+                                    
+                                    log.info(f"Declined join request via deep link for user {join_uid} in group {join_gid}")
+                                except Exception as e:
+                                    log.exception("Failed to decline join request via deep link gid=%s uid=%s: %s", join_gid, join_uid, e)
+                                    error_msg = await context.bot.send_message(
+                                        chat_id=update.effective_chat.id,
+                                        text=t(lang, "join.error")
+                                    )
+                                    # Delete error message after 5 seconds  
+                                    async def delete_error(ctx):
+                                        try:
+                                            await ctx.bot.delete_message(update.effective_chat.id, error_msg.message_id)
+                                        except Exception:
+                                            pass
+                                    context.job_queue.run_once(delete_error, when=5)
+                            
+                            # Track user interaction
+                            from .infra import db
+                            from .infra.repos import UsersRepo
+                            try:
+                                async with db.SessionLocal() as s:  # type: ignore
+                                    await UsersRepo(s).upsert_user(
+                                        uid=join_uid,
+                                        username=getattr(update.effective_user, 'username', None),
+                                        first_name=getattr(update.effective_user, 'first_name', None),
+                                        last_name=getattr(update.effective_user, 'last_name', None),
+                                        language=getattr(update.effective_user, 'language_code', None),
+                                    )
+                                    await s.commit()
+                            except Exception:
+                                pass
+                            return  # Exit early after processing join request
+            except Exception:
+                pass  # Not a join request deep link, continue with normal processing
+        
+        # Normal rules deep links
         if param.startswith("rulesu_"):
             uname = param[7:]
             try:

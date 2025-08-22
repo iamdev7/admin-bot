@@ -49,24 +49,18 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     lang = I18N.pick_lang(update)
     mode = cfg.get("mode", "button")
     timeout = int(cfg.get("timeout", 120))
-    # Restrict until verified
-    try:
-        await context.bot.restrict_chat_member(
-            chat.id,
-            user.id,
-            permissions=ChatPermissions(can_send_messages=False),
-            until_date=int(time.time()) + timeout + 60,
-        )
-    except Exception as e:
-        log.exception("verify: restrict failed gid=%s uid=%s: %s", chat.id, user.id, e)
+    
+    # NOTE: We do NOT restrict immediately because restricted users cannot click inline buttons
+    # We'll only kick them if they timeout without answering
+    log.info(f"CAPTCHA enabled for user {user.id} in chat {chat.id}, mode: {mode}, timeout: {timeout}s")
     # Prepare captcha
     answer = None
-    text = t(lang, "captcha.prompt")
+    text = t(lang, "captcha.prompt") + f"\n⏱ {timeout}s"
     buttons = []
     if mode == "math":
         a, b = random.randint(1, 9), random.randint(1, 9)
         answer = a + b
-        text = t(lang, "captcha.math", a=a, b=b)
+        text = t(lang, "captcha.math", a=a, b=b) + f"\n⏱ {timeout}s"
         options = set([answer, random.randint(1, 18), random.randint(1, 18)])
         options = list(sorted(options))
         row = [InlineKeyboardButton(str(opt), callback_data=f"captcha:math:{chat.id}:{user.id}:{opt}") for opt in options]
@@ -82,22 +76,76 @@ async def on_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def on_captcha_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not update.callback_query:
-        return
-    await update.callback_query.answer()
-    data = (update.callback_query.data or "").split(":")
-    if len(data) < 4:
-        return
-    typ = data[1]
-    chat_id = int(data[2])
-    user_id = int(data[3])
-    if update.effective_user and update.effective_user.id != user_id:
-        return
-    pending = _store(context).get((chat_id, user_id))
-    if not pending:
-        return
-    if typ == "ok" or (typ == "math" and len(data) == 5 and pending.answer == int(data[4])):
+    try:
+        if not update.callback_query:
+            log.error("CAPTCHA callback: No callback_query in update")
+            return
+        
+        callback_data = update.callback_query.data or ""
+        log.info(f"CAPTCHA callback received: {callback_data}")
+        
+        data = callback_data.split(":")
+        if len(data) < 4:
+            log.warning(f"CAPTCHA callback: Invalid data format: {callback_data}")
+            await update.callback_query.answer()
+            return
+        
+        typ = data[1]
+        chat_id = int(data[2])
+        user_id = int(data[3])
+        
+        log.info(f"CAPTCHA callback: type={typ}, chat_id={chat_id}, user_id={user_id}, effective_user={update.effective_user.id if update.effective_user else 'None'}")
+        
+        # Check if this is the correct user
+        if update.effective_user and update.effective_user.id != user_id:
+            lang = I18N.pick_lang(update)
+            log.info(f"CAPTCHA: Wrong user {update.effective_user.id} tried to answer for user {user_id}")
+            await update.callback_query.answer(
+                t(lang, "captcha.wrong_user") or "❌ You are not the one required to solve this.",
+                show_alert=True
+            )
+            return
+        
+        await update.callback_query.answer()
+        
+        # Check pending verification
+        store = _store(context)
+        log.info(f"CAPTCHA store keys: {list(store.keys())}")
+        pending = store.get((chat_id, user_id))
+        
+        if not pending:
+            log.warning(f"No pending CAPTCHA for user {user_id} in chat {chat_id}")
+            log.warning(f"Available pending CAPTCHAs: {[(k, v.mode) for k, v in store.items()]}")
+            return
+    except Exception as e:
+        log.exception(f"Error in CAPTCHA callback: {e}")
+        if update.callback_query:
+            try:
+                await update.callback_query.answer("Error processing CAPTCHA. Please try again.", show_alert=True)
+            except:
+                pass
+        raise
+    
+    # Log pending data details
+    log.info(f"Found pending CAPTCHA: mode={pending.mode}, answer={pending.answer}, deadline={pending.deadline}")
+    
+    # Check if answer is correct
+    is_correct = False
+    if typ == "ok":
+        is_correct = True
+        log.info(f"User {user_id} clicked 'I am human' button for chat {chat_id}")
+    elif typ == "math" and len(data) == 5:
+        try:
+            user_answer = int(data[4])
+            is_correct = (pending.answer == user_answer)
+            log.info(f"User {user_id} answered {user_answer} (correct: {pending.answer}, is_correct: {is_correct}) for chat {chat_id}")
+        except ValueError as e:
+            log.error(f"Failed to parse math answer: {data[4]}, error: {e}")
+            is_correct = False
+    
+    if is_correct:
         # Verified — restore group default permissions
+        log.info(f"CAPTCHA verified for user {user_id} in chat {chat_id}")
         try:
             perms = await group_default_permissions(context, chat_id)
             await context.bot.restrict_chat_member(chat_id, user_id, permissions=perms)
@@ -111,6 +159,14 @@ async def on_captcha_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         # cancel job
         for jb in context.job_queue.get_jobs_by_name(f"verify:{chat_id}:{user_id}"):
             jb.schedule_removal()
+    else:
+        # Wrong answer
+        log.info(f"Wrong CAPTCHA answer from user {user_id} in chat {chat_id}")
+        lang = I18N.pick_lang(update)
+        await update.callback_query.answer(
+            t(lang, "captcha.wrong_answer") or "❌ Wrong answer. Try again.",
+            show_alert=True
+        )
 
 
 async def timeout_kick(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -123,9 +179,20 @@ async def timeout_kick(context: ContextTypes.DEFAULT_TYPE) -> None:
     pending = _store(context).get((chat_id, user_id))
     if not pending:
         return
+    
+    log.info(f"CAPTCHA timeout for user {user_id} in chat {chat_id}, kicking user")
+    
+    # Try to delete the CAPTCHA message
+    try:
+        await context.bot.delete_message(chat_id, pending.message_id)
+    except Exception as e:
+        log.warning(f"Failed to delete CAPTCHA message on timeout: {e}")
+    
+    # Kick the user
     try:
         await context.bot.ban_chat_member(chat_id, user_id)
         await context.bot.unban_chat_member(chat_id, user_id)
     except Exception as e:
         log.exception("verify: timeout kick failed gid=%s uid=%s: %s", chat_id, user_id, e)
+    
     _store(context).pop((chat_id, user_id), None)

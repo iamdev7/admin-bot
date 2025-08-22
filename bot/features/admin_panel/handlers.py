@@ -335,6 +335,10 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 return await show_welcome(update, context, gid)
             if tab == "automations":
                 return await show_automations(update, context, gid)
+            if tab == "onboarding":
+                return await show_onboarding(update, context, gid)
+            if tab == "audit":
+                return await show_audit(update, context, gid, 0)
 
         if len(parts) >= 5 and parts[3] == "auto2":
             step = parts[4]
@@ -427,6 +431,22 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             async with db.SessionLocal() as s:  # type: ignore
                 cfg = await SettingsRepo(s).get(gid, "auto_approve_join") or {"enabled": False}
                 cfg["enabled"] = not bool(cfg.get("enabled"))
+                
+                # If enabling auto_approve, disable require_accept (they conflict)
+                if cfg["enabled"]:
+                    ob_cfg = await SettingsRepo(s).get(gid, "onboarding") or {"require_accept": False}
+                    if ob_cfg.get("require_accept"):
+                        ob_cfg["require_accept"] = False
+                        await SettingsRepo(s).set(gid, "onboarding", ob_cfg)
+                        log.info(f"Disabled require_accept for {gid} due to auto_approve being enabled")
+                else:
+                    # If disabling auto_approve, also disable CAPTCHA (it won't work without auto-approve)
+                    captcha_cfg = await SettingsRepo(s).get(gid, "captcha") or {"enabled": False}
+                    if captcha_cfg.get("enabled"):
+                        captcha_cfg["enabled"] = False
+                        await SettingsRepo(s).set(gid, "captcha", captcha_cfg)
+                        log.info(f"Disabled CAPTCHA for {gid} due to auto_approve being disabled")
+                
                 await SettingsRepo(s).set(gid, "auto_approve_join", cfg)
                 await s.commit()
             return await show_onboarding(update, context, gid)
@@ -470,6 +490,15 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 async with db.SessionLocal() as s:  # type: ignore
                     cfg = await SettingsRepo(s).get(gid, "onboarding") or {"require_accept": False}
                     cfg["require_accept"] = not bool(cfg.get("require_accept", False))
+                    
+                    # If enabling require_accept, disable auto_approve (they conflict)
+                    if cfg["require_accept"]:
+                        auto_cfg = await SettingsRepo(s).get(gid, "auto_approve_join") or {"enabled": False}
+                        if auto_cfg.get("enabled"):
+                            auto_cfg["enabled"] = False
+                            await SettingsRepo(s).set(gid, "auto_approve_join", auto_cfg)
+                            log.info(f"Disabled auto_approve for {gid} due to require_accept being enabled")
+                    
                     await SettingsRepo(s).set(gid, "onboarding", cfg)
                     await s.commit()
                 return await show_onboarding(update, context, gid)
@@ -484,7 +513,25 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 async with db.SessionLocal() as s:  # type: ignore
                     cap = await SettingsRepo(s).get(gid, "captcha") or {"enabled": False, "mode": "button", "timeout": 120}
                     if len(parts) >= 6 and parts[5] == "toggle":
-                        cap["enabled"] = not bool(cap.get("enabled", False))
+                        new_enabled = not bool(cap.get("enabled", False))
+                        
+                        # CAPTCHA only works with auto_approve enabled
+                        if new_enabled:
+                            auto_cfg = await SettingsRepo(s).get(gid, "auto_approve_join") or {"enabled": False}
+                            if not auto_cfg.get("enabled"):
+                                # Enable auto_approve if trying to enable CAPTCHA
+                                auto_cfg["enabled"] = True
+                                await SettingsRepo(s).set(gid, "auto_approve_join", auto_cfg)
+                                log.info(f"Enabled auto_approve for {gid} because CAPTCHA was enabled")
+                                
+                                # Also disable require_accept since auto_approve is now on
+                                ob_cfg = await SettingsRepo(s).get(gid, "onboarding") or {"require_accept": False}
+                                if ob_cfg.get("require_accept"):
+                                    ob_cfg["require_accept"] = False
+                                    await SettingsRepo(s).set(gid, "onboarding", ob_cfg)
+                                    log.info(f"Disabled require_accept for {gid} due to CAPTCHA/auto_approve being enabled")
+                        
+                        cap["enabled"] = new_enabled
                     if len(parts) >= 7 and parts[5] == "mode" and parts[6] in {"button", "math"}:
                         cap["mode"] = parts[6]
                     if len(parts) >= 7 and parts[5] == "timeout" and parts[6].isdigit():
@@ -1062,11 +1109,34 @@ async def show_onboarding(update: Update, context: ContextTypes.DEFAULT_TYPE, gi
         auto = await SettingsRepo(s).get(gid, "auto_approve_join") or {"enabled": False}
         ob = await SettingsRepo(s).get(gid, "onboarding") or {"require_accept": False}
         cap = await SettingsRepo(s).get(gid, "captcha") or {"enabled": False, "mode": "button", "timeout": 120}
-    label = t(lang, "panel.onboarding.title") + "\n" + t(
-        lang, "panel.onboarding.auto", state="ON" if auto.get("enabled") else "OFF"
-    ) + "\n" + t(lang, "panel.onboarding.require", state="ON" if ob.get("require_accept") else "OFF") + "\n" + t(
-        lang, "panel.onboarding.require_unmute", state="ON" if ob.get("require_accept_unmute") else "OFF"
-    ) + "\n" + t(lang, "panel.onboarding.captcha", state="ON" if cap.get("enabled") else "OFF") + f"\nMode: {cap.get('mode')} | Timeout: {cap.get('timeout')}s"
+    
+    # Build status display with compatibility notes
+    auto_enabled = auto.get("enabled", False)
+    require_accept = ob.get("require_accept", False)
+    captcha_enabled = cap.get("enabled", False)
+    
+    status_lines = [t(lang, "panel.onboarding.title")]
+    
+    # Auto-approve status
+    status_lines.append(t(lang, "panel.onboarding.auto", state="ON" if auto_enabled else "OFF"))
+    if auto_enabled and require_accept:
+        status_lines.append("⚠️ Conflicts with Require Accept")
+    
+    # Require accept status  
+    status_lines.append(t(lang, "panel.onboarding.require", state="ON" if require_accept else "OFF"))
+    if require_accept and auto_enabled:
+        status_lines.append("⚠️ Conflicts with Auto-Approve")
+    
+    # Require unmute status
+    status_lines.append(t(lang, "panel.onboarding.require_unmute", state="ON" if ob.get("require_accept_unmute") else "OFF"))
+    
+    # CAPTCHA status
+    status_lines.append(t(lang, "panel.onboarding.captcha", state="ON" if captcha_enabled else "OFF"))
+    if captcha_enabled and not auto_enabled:
+        status_lines.append("⚠️ Requires Auto-Approve to work")
+    status_lines.append(f"CAPTCHA Mode: {cap.get('mode')} | Timeout: {cap.get('timeout')}s")
+    
+    label = "\n".join(status_lines)
     kb = [
         [InlineKeyboardButton(t(lang, "panel.toggle"), callback_data=f"panel:group:{gid}:onboarding:toggle")],
         [InlineKeyboardButton(t(lang, "panel.onboarding.toggle_require"), callback_data=f"panel:group:{gid}:onboarding:require")],
@@ -1084,7 +1154,14 @@ async def show_onboarding(update: Update, context: ContextTypes.DEFAULT_TYPE, gi
         ],
         [InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:home")],
     ]
-    await update.effective_message.edit_text(label, reply_markup=InlineKeyboardMarkup(kb))
+    try:
+        await update.effective_message.edit_text(label, reply_markup=InlineKeyboardMarkup(kb))
+    except Exception as e:
+        if "Message is not modified" in str(e):
+            # Message content hasn't changed, show a small notification
+            await update.callback_query.answer("Settings updated ✓", show_alert=False)
+        else:
+            raise
 
 
 async def show_moderation(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
@@ -1572,22 +1649,6 @@ async def show_audit(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: in
     kb.append([InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:home")])
     await update.effective_message.edit_text(text, reply_markup=InlineKeyboardMarkup(kb))
 
-
-async def show_onboarding(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
-    lang = I18N.pick_lang(update)
-    async with db.SessionLocal() as s:  # type: ignore
-        cfg = await SettingsRepo(s).get(gid, "auto_approve_join") or {"enabled": False}
-    enabled = bool(cfg.get("enabled"))
-    label = t(lang, "panel.onboarding.title") + "\n" + t(
-        lang, "panel.onboarding.auto", state="ON" if enabled else "OFF"
-    )
-    kb = [
-        [
-            InlineKeyboardButton(t(lang, "panel.toggle"), callback_data=f"panel:group:{gid}:onboarding:toggle"),
-            InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:home"),
-        ]
-    ]
-    await update.effective_message.edit_text(label, reply_markup=InlineKeyboardMarkup(kb))
 
 
 def register_callbacks(app):

@@ -310,21 +310,22 @@ async def prompt_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             owner_id = update.effective_user.id if update.effective_user else 0
             context.bot_data[f"botadm_last_sel:{owner_id}"] = {"targets": targets}
             # Also store prompt message info for album broadcasts
-            if msg:
+            if update.callback_query and update.callback_query.message:
                 context.bot_data[f"botadm_prompt:{owner_id}"] = {
-                    "msg_id": msg.message_id,
-                    "chat_id": msg.chat_id
+                    "msg_id": update.callback_query.message.message_id,
+                    "chat_id": update.callback_query.message.chat_id
                 }
     except Exception as e:
         log.error("Failed to snapshot targets for broadcast: %s", e)
 
 
-async def _send_copy_to_targets(context: ContextTypes.DEFAULT_TYPE, targets: list[int], src_chat: int, src_mid: int, progress_msg=None) -> tuple[int, int]:
+async def _send_copy_to_targets(context: ContextTypes.DEFAULT_TYPE, targets: list[int], src_chat: int, src_mid: int, progress_msg=None) -> tuple[int, int, list[int]]:
     """Send a message to multiple targets with progress updates.
-    Returns (sent_count, failed_count)"""
+    Returns (sent_count, failed_count, failed_ids)"""
     import asyncio
     sent = 0
     failed = 0
+    failed_ids = []
     total = len(targets)
     
     for i, tid in enumerate(targets):
@@ -348,23 +349,28 @@ async def _send_copy_to_targets(context: ContextTypes.DEFAULT_TYPE, targets: lis
                     
         except Exception as e:
             failed += 1
-            log.warning(f"Broadcast failed for chat {tid}: {e}")
+            failed_ids.append(tid)
+            if "Forbidden: bot can't initiate conversation" in str(e):
+                log.info(f"Broadcast failed for user {tid}: User hasn't started the bot")
+            else:
+                log.warning(f"Broadcast failed for chat {tid}: {e}")
             
         # Small delay to avoid rate limits
         if i < len(targets) - 1:
             await asyncio.sleep(0.05)
             
-    return sent, failed
+    return sent, failed, failed_ids
 
 
-async def _send_album_to_targets(context: ContextTypes.DEFAULT_TYPE, targets: list[int], album: list[dict], progress_msg=None) -> tuple[int, int]:
+async def _send_album_to_targets(context: ContextTypes.DEFAULT_TYPE, targets: list[int], album: list[dict], progress_msg=None) -> tuple[int, int, list[int]]:
     """Send media album to multiple targets.
-    Returns (sent_count, failed_count)"""
+    Returns (sent_count, failed_count, failed_ids)"""
     import asyncio
     from telegram import InputMediaPhoto, InputMediaVideo, InputMediaDocument, InputMediaAudio
     
     sent = 0
     failed = 0
+    failed_ids = []
     total = len(targets)
 
     def build(media: list[dict]):
@@ -406,13 +412,17 @@ async def _send_album_to_targets(context: ContextTypes.DEFAULT_TYPE, targets: li
                     
         except Exception as e:
             failed += 1
-            log.warning(f"Album broadcast failed for chat {tid}: {e}")
+            failed_ids.append(tid)
+            if "Forbidden: bot can't initiate conversation" in str(e):
+                log.info(f"Album broadcast failed for user {tid}: User hasn't started the bot")
+            else:
+                log.warning(f"Album broadcast failed for chat {tid}: {e}")
             
         # Small delay to avoid rate limits
         if i < len(targets) - 1:
             await asyncio.sleep(0.05)
             
-    return sent, failed
+    return sent, failed, failed_ids
 
 
 async def _targets_from_selection(context: ContextTypes.DEFAULT_TYPE) -> list[int]:
@@ -435,9 +445,10 @@ async def _targets_from_selection(context: ContextTypes.DEFAULT_TYPE) -> list[in
             from sqlalchemy import select
             from ...infra.models import User
 
-            users = (await s.execute(select(User))).scalars().all()
+            # Only select users who have interacted with the bot (seen_at is not null)
+            users = (await s.execute(select(User).where(User.seen_at.is_not(None)))).scalars().all()
             targets = [u.id for u in users]
-            log.info(f"Found {len(targets)} users to broadcast to")
+            log.info(f"Found {len(targets)} users to broadcast to (filtered to those who have started the bot)")
     elif target == "chat":
         cid = sel.get("chat_id")
         if isinstance(cid, int):
@@ -558,7 +569,7 @@ async def on_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         
         # Send broadcast with progress updates
-        sent, failed = await _send_copy_to_targets(
+        sent, failed, failed_ids = await _send_copy_to_targets(
             context, targets, 
             update.effective_chat.id, 
             update.effective_message.message_id,
@@ -586,6 +597,14 @@ async def on_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # Show final status in progress message
         if failed > 0:
             final_text = t(lang, "botadm.bc.sent_with_errors", sent=sent, failed=failed, total=len(targets))
+            # Add list of failed IDs
+            if failed_ids:
+                final_text += f"\n\n⚠️ Failed to send to these users:\n"
+                # Show first 10 failed IDs
+                for fid in failed_ids[:10]:
+                    final_text += f"• {fid}\n"
+                if len(failed_ids) > 10:
+                    final_text += f"• ... and {len(failed_ids) - 10} more"
         else:
             final_text = t(lang, "botadm.bc.sent", n=sent)
         
@@ -742,7 +761,7 @@ async def _finalize_broadcast_album(context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     
     # Try to notify owner about broadcast completion
-    sent, failed = await _send_album_to_targets(context, targets, items)
+    sent, failed, failed_ids = await _send_album_to_targets(context, targets, items)
     
     # Try to send status message and edit prompt message back to menu
     try:
@@ -788,6 +807,14 @@ async def _finalize_broadcast_album(context: ContextTypes.DEFAULT_TYPE) -> None:
             # Send completion status using translations
             if failed > 0:
                 status_text = t(lang, "botadm.bc.sent_with_errors", sent=sent, failed=failed, total=sent + failed)
+                # Add list of failed IDs
+                if failed_ids:
+                    status_text += f"\n\n⚠️ Failed to send to these users:\n"
+                    # Show first 10 failed IDs
+                    for fid in failed_ids[:10]:
+                        status_text += f"• {fid}\n"
+                    if len(failed_ids) > 10:
+                        status_text += f"• ... and {len(failed_ids) - 10} more"
             else:
                 status_text = t(lang, "botadm.bc.sent", n=sent)
             
