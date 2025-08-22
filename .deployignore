@@ -15,8 +15,7 @@ __pycache__/
 *.pyo
 
 # Local configuration and secrets
-.env
-.env.*
+# (env files are deployed like normal files by request)
 
 # Data and databases (must NOT be uploaded)
 data/
@@ -26,4 +25,3 @@ data/
 # Logs and pid files
 *.log
 *.pid
-

@@ -21,10 +21,11 @@ from telegram.ext import (
 
 from .core.config import settings
 from .core.i18n import I18N, t
-import logging
-log = logging.getLogger(__name__)
-from .core.logging import setup_logging
-from .core.errors import register_error_handler
+from .core.logging_config import setup_logging, get_logger
+from .core.error_handler import setup_error_handlers
+from .core.backup import schedule_backups, manual_backup_command
+
+log = get_logger(__name__)
 from .core.user_tracker import register_user_tracking
 from .infra.db import init_engine, init_sessionmaker
 from .infra.migrate import migrate
@@ -47,6 +48,7 @@ async def on_startup(app: Application) -> None:
     await migrate()  # ensure DB and pragmas
     await set_bot_commands(app)
     await load_jobs(app)
+    schedule_backups(app)  # Schedule database backups
 
 
 async def set_bot_commands(app: Application) -> None:
@@ -55,6 +57,7 @@ async def set_bot_commands(app: Application) -> None:
         BotCommand("help", "Show help"),
         BotCommand("rules", "Show group rules"),
         BotCommand("settings", "Open settings (admins)"),
+        BotCommand("backup", "Create database backup (bot owner only)"),
     ]
     await app.bot.set_my_commands(cmds)
 
@@ -82,6 +85,8 @@ def make_app() -> Application:
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_))
     
+    # Admin backup command
+    app.add_handler(CommandHandler("backup", manual_backup_command))
 
     # Feature registrations
     register_moderation(app)
@@ -101,8 +106,8 @@ def make_app() -> Application:
         return None
     app.add_handler(CallbackQueryHandler(_noop), group=10)
 
-    # Errors
-    register_error_handler(app)
+    # Set up error handling
+    setup_error_handlers(app)
 
     return app
 
@@ -207,8 +212,12 @@ async def help_(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
 async def main() -> None:
     # Ensure data directory exists for SQLite path
     from pathlib import Path
-
     Path("data").mkdir(exist_ok=True)
+    
+    # Set up logging (debug mode from env)
+    import os
+    debug_mode = os.getenv("DEBUG", "").lower() in ("1", "true", "yes")
+    setup_logging(log_file=True, debug=debug_mode)
     
     # Log startup info
     log.info(f"Bot starting with {len(settings.OWNER_IDS)} owner(s) configured")
@@ -233,6 +242,11 @@ if __name__ == "__main__":
     # Ensure data directory exists for SQLite path
     from pathlib import Path
     Path("data").mkdir(exist_ok=True)
+    
+    # Set up logging first (debug mode from env)
+    import os
+    debug_mode = os.getenv("DEBUG", "").lower() in ("1", "true", "yes")
+    setup_logging(log_file=True, debug=debug_mode)
     
     # Initialize database synchronously
     loop = asyncio.new_event_loop()
