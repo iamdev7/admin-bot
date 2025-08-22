@@ -108,6 +108,10 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if data[1] == "bl":
         if len(data) >= 3 and data[2] == "add":
             context.user_data["botadm_wait_word"] = True
+            # Remember current message for clean edits later
+            if update.callback_query and update.callback_query.message:
+                context.user_data["botadm_prompt_msg_id"] = update.callback_query.message.message_id
+                context.user_data["botadm_prompt_chat_id"] = update.callback_query.message.chat_id
             kb = [[InlineKeyboardButton(t(lang, "botadm.back"), callback_data="botadm:nav:blacklist")]]
             return await Navigator.edit_or_send(update, t(lang, "botadm.bl.prompt_add"), kb, parse_mode="Markdown")
         elif len(data) >= 3 and data[2] == "export":
@@ -119,8 +123,30 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             return await Navigator.edit_or_send(update, txt, kb)
         elif len(data) >= 3 and data[2] == "import":
             context.user_data["botadm_wait_import"] = True
+            # Remember current message for clean edits later
+            if update.callback_query and update.callback_query.message:
+                context.user_data["botadm_prompt_msg_id"] = update.callback_query.message.message_id
+                context.user_data["botadm_prompt_chat_id"] = update.callback_query.message.chat_id
             kb = [[InlineKeyboardButton(t(lang, "botadm.back"), callback_data="botadm:nav:blacklist")]]
             return await Navigator.edit_or_send(update, t(lang, "botadm.bl.prompt_import"), kb)
+        elif len(data) >= 4 and data[2] == "clear" and data[3] == "yes":
+            # Clear all words after confirmation
+            async with db.SessionLocal() as s:  # type: ignore
+                cfg = await SettingsRepo(s).get(0, "global_blacklist") or {"words": [], "action": "warn"}
+                cfg["words"] = []
+                await SettingsRepo(s).set(0, "global_blacklist", cfg)
+                await s.commit()
+            await update.callback_query.answer(t(lang, "botadm.bl.cleared"), show_alert=False)
+            return await Navigator.go_blacklist(update, context)
+        elif len(data) >= 3 and data[2] == "clear":
+            # Ask for confirmation before clearing all words
+            kb = [
+                [
+                    InlineKeyboardButton(t(lang, "botadm.proceed"), callback_data="botadm:bl:clear:yes"),
+                    InlineKeyboardButton(t(lang, "botadm.cancel"), callback_data="botadm:nav:blacklist"),
+                ]
+            ]
+            return await Navigator.edit_or_send(update, t(lang, "botadm.bl.clear_confirm"), kb)
         elif len(data) >= 3 and data[2] == "action" and len(data) >= 4:
             action = data[3]
             if action in {"warn", "mute", "ban"}:
@@ -138,26 +164,48 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             # Handle manage view navigation
             page = int(data[3]) if len(data) >= 4 else 0
             return await Navigator.go_blacklist_manage(update, context, page=page)
-        elif len(data) >= 3 and data[2] == "clear":
-            # Clear all words with confirmation
+        elif len(data) >= 3 and data[2] == "delidx" and len(data) >= 5:
+            # Safer deletion by index, preserves page
+            try:
+                page = int(data[3])
+                idx = int(data[4])
+            except Exception:
+                page = 0
+                idx = -1
             async with db.SessionLocal() as s:  # type: ignore
                 cfg = await SettingsRepo(s).get(0, "global_blacklist") or {"words": [], "action": "warn"}
-                cfg["words"] = []
-                await SettingsRepo(s).set(0, "global_blacklist", cfg)
-                await s.commit()
-            await update.effective_message.answer(t(lang, "botadm.bl.cleared"))
-            return await Navigator.go_blacklist(update, context)
+                words = sorted(list(cfg.get("words", [])), key=lambda w: str(w).casefold())
+                if 0 <= idx < len(words):
+                    removed_word = words.pop(idx)
+                    cfg["words"] = words
+                    await SettingsRepo(s).set(0, "global_blacklist", cfg)
+                    await s.commit()
+                    log.info("Removed blacklist word by index: %s", removed_word)
+                # Adjust page if it overflowed after deletion
+                page_size = 10
+                max_page = max(0, (len(words) - 1) // page_size)
+                if page > max_page:
+                    page = max_page
+            return await Navigator.go_blacklist_manage(update, context, page=page)
         elif len(data) >= 3 and data[2] == "del" and len(data) >= 4:
+            # Backward-compat: try to delete by value or unique prefix (was truncated before)
             word = data[3]
             async with db.SessionLocal() as s:  # type: ignore
                 cfg = await SettingsRepo(s).get(0, "global_blacklist") or {"words": [], "action": "warn"}
-                words = [w for w in cfg.get("words", []) if w != word]
+                words = list(cfg.get("words", []))
+                if word in words:
+                    words = [w for w in words if w != word]
+                else:
+                    # Try unique prefix match (for previous 50-char truncation)
+                    candidates = [w for w in words if isinstance(w, str) and w.startswith(word)]
+                    if len(candidates) == 1:
+                        target = candidates[0]
+                        words = [w for w in words if w != target]
                 cfg["words"] = words
                 await SettingsRepo(s).set(0, "global_blacklist", cfg)
                 await s.commit()
-            # Return to manage view at the same page
-            page = 0  # Could track page in context if needed
-            return await Navigator.go_blacklist_manage(update, context, page=page)
+            # Return to manage view
+            return await Navigator.go_blacklist_manage(update, context, page=0)
     
     # Handle violators callbacks
     if data[1] == "violators":
@@ -548,26 +596,39 @@ async def on_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # Global blacklist: add words (supports multiple lines)
     if context.user_data.get("botadm_wait_word"):
-        context.user_data["botadm_wait_word"] = False
-        text = (update.effective_message.text or "").strip()
+        text_input = (update.effective_message.text or "").strip()
         lang = I18N.pick_lang(update)
-        
-        if not text:
-            await update.effective_message.reply_text(t(lang, "botadm.bl.invalid"))
-            # Return to blacklist menu
-            return await Navigator.go_blacklist(update, context)
-        
+
+        # Prepare stored prompt message details
+        prompt_msg_id = context.user_data.get("botadm_prompt_msg_id")
+        prompt_chat_id = context.user_data.get("botadm_prompt_chat_id")
+
         # Split by lines and process each line as a separate word/phrase
         new_words = []
-        for line in text.split('\n'):
-            line = line.strip().lower()
-            if line:  # Skip empty lines
-                new_words.append(line)
-        
+        if text_input:
+            for line in text_input.split('\n'):
+                line = line.strip().lower()
+                if line:
+                    new_words.append(line)
+
         if not new_words:
-            await update.effective_message.reply_text(t(lang, "botadm.bl.invalid"))
-            return await Navigator.go_blacklist(update, context)
-        
+            # Keep waiting for valid input and edit the existing prompt message
+            context.user_data["botadm_wait_word"] = True
+            kb = [[InlineKeyboardButton(t(lang, "botadm.back"), callback_data="botadm:nav:blacklist")]]
+            err_text = t(lang, "botadm.bl.invalid") + "\n\n" + t(lang, "botadm.bl.prompt_add")
+            try:
+                if prompt_msg_id and prompt_chat_id:
+                    await context.bot.edit_message_text(chat_id=prompt_chat_id, message_id=prompt_msg_id, text=err_text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
+                else:
+                    await Navigator.edit_or_send(update, err_text, kb, parse_mode="Markdown")
+            finally:
+                # Delete user's message to keep chat clean
+                try:
+                    await update.effective_message.delete()
+                except Exception:
+                    pass
+            return
+
         # Add all new words to blacklist
         async with db.SessionLocal() as s:  # type: ignore
             cfg = await SettingsRepo(s).get(0, "global_blacklist") or {"words": [], "action": "warn"}
@@ -576,31 +637,36 @@ async def on_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             cfg["words"] = list(sorted(words))
             await SettingsRepo(s).set(0, "global_blacklist", cfg)
             await s.commit()
-        
-        # Send confirmation message with count
-        added_count = len(new_words)
-        if added_count == 1:
-            confirmation = t(lang, "botadm.bl.added_single")
-        else:
-            confirmation = t(lang, "botadm.bl.added_multiple", count=added_count)
-        
-        await update.effective_message.reply_text(confirmation)
-        
+
+        # Done waiting
+        context.user_data["botadm_wait_word"] = False
+
         # Delete user's message to keep chat clean
         try:
             await update.effective_message.delete()
         except Exception:
             pass
-        
-        # Update blacklist display
-        return await Navigator.go_blacklist(update, context)
+
+        # Edit the original prompt message back to the blacklist view
+        try:
+            text, rows, parse_mode = await Navigator.render_blacklist(context, lang, page=0)
+            if prompt_msg_id and prompt_chat_id:
+                await context.bot.edit_message_text(chat_id=prompt_chat_id, message_id=prompt_msg_id, text=text, reply_markup=InlineKeyboardMarkup(rows), parse_mode=parse_mode)
+            else:
+                # Fallback
+                await Navigator.go_blacklist(update, context)
+        finally:
+            context.user_data.pop("botadm_prompt_msg_id", None)
+            context.user_data.pop("botadm_prompt_chat_id", None)
     # Global blacklist: import JSON
     if context.user_data.get("botadm_wait_import"):
-        context.user_data["botadm_wait_import"] = False
         import json
         lang = I18N.pick_lang(update)
         raw = update.effective_message.text or ""
-        success = False
+
+        prompt_msg_id = context.user_data.get("botadm_prompt_msg_id")
+        prompt_chat_id = context.user_data.get("botadm_prompt_chat_id")
+
         try:
             cfg = json.loads(raw)
             if not isinstance(cfg, dict):
@@ -613,21 +679,43 @@ async def on_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             async with db.SessionLocal() as s:  # type: ignore
                 await SettingsRepo(s).set(0, "global_blacklist", {"words": list(sorted(set(words))), "action": action})
                 await s.commit()
-            await update.effective_message.reply_text(t(lang, "botadm.bl.import_ok"))
-            success = True
+
+            # Success: stop waiting
+            context.user_data["botadm_wait_import"] = False
+
+            # Delete user's message
+            try:
+                await update.effective_message.delete()
+            except Exception:
+                pass
+
+            # Edit the original prompt message back to the blacklist view
+            text, rows, parse_mode = await Navigator.render_blacklist(context, lang, page=0)
+            if prompt_msg_id and prompt_chat_id:
+                await context.bot.edit_message_text(chat_id=prompt_chat_id, message_id=prompt_msg_id, text=text, reply_markup=InlineKeyboardMarkup(rows), parse_mode=parse_mode)
+            else:
+                await Navigator.go_blacklist(update, context)
+
+            # Clean up stored prompt refs
+            context.user_data.pop("botadm_prompt_msg_id", None)
+            context.user_data.pop("botadm_prompt_chat_id", None)
+            return
         except Exception:
-            await update.effective_message.reply_text(t(lang, "common.invalid_json"))
-        
-        # Delete user's message to keep chat clean
-        try:
-            await update.effective_message.delete()
-        except Exception:
-            pass
-        
-        # Return to blacklist if successful
-        if success:
-            return await Navigator.go_blacklist(update, context)
-        return
+            # Invalid JSON: keep waiting and edit the prompt with error message
+            context.user_data["botadm_wait_import"] = True
+            kb = [[InlineKeyboardButton(t(lang, "botadm.back"), callback_data="botadm:nav:blacklist")]]
+            err_text = t(lang, "common.invalid_json") + "\n\n" + t(lang, "botadm.bl.prompt_import")
+            try:
+                if prompt_msg_id and prompt_chat_id:
+                    await context.bot.edit_message_text(chat_id=prompt_chat_id, message_id=prompt_msg_id, text=err_text, reply_markup=InlineKeyboardMarkup(kb))
+                else:
+                    await Navigator.edit_or_send(update, err_text, kb)
+            finally:
+                try:
+                    await update.effective_message.delete()
+                except Exception:
+                    pass
+            return
 
 
 async def _finalize_broadcast_album(context: ContextTypes.DEFAULT_TYPE) -> None:

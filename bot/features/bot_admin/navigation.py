@@ -156,63 +156,89 @@ class Navigator:
             )).scalar_one())
         
         text = (
-            f"📊 **Bot Statistics**\n\n"
-            f"👥 **Users:** {users} total\n"
-            f"  • Active (24h): {active_24h}\n"
-            f"  • Active (7d): {active_7d}\n\n"
-            f"💬 **Groups:** {groups}\n"
-            f"🤖 **Automations:** {autos}\n"
-            f"⚠️ **Violations:** {violations}"
+            f"📊 *Bot Statistics*\n\n"
+            f"👥 *Users:* {users} total\n"
+            f"  • Active \(24h\): {active_24h}\n"
+            f"  • Active \(7d\): {active_7d}\n\n"
+            f"💬 *Groups:* {groups}\n"
+            f"🤖 *Automations:* {autos}\n"
+            f"⚠️ *Violations:* {violations}"
         )
         
         keyboard = [[InlineKeyboardButton(t(lang, "botadm.back"), callback_data="botadm:nav:home")]]
         
-        await Navigator.edit_or_send(update, text, keyboard, parse_mode="Markdown")
+        await Navigator.edit_or_send(update, text, keyboard, parse_mode="MarkdownV2")
     
     @staticmethod
     async def go_blacklist(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 0) -> None:
         """Navigate to blacklist management with pagination."""
-        from ...infra import db
-        from ...infra.settings_repo import SettingsRepo
-        
         lang = I18N.pick_lang(update)
-        
+
         # Clear blacklist states
         context.user_data.pop("botadm_wait_word", None)
         context.user_data.pop("botadm_wait_import", None)
-        
+
+        # Render and show
+        text, rows, parse_mode = await Navigator.render_blacklist(context, lang, page=page)
+        await Navigator.edit_or_send(
+            update,
+            text,
+            rows,
+            parse_mode=parse_mode
+        )
+
+    @staticmethod
+    def escape_markdown_v2(text: str) -> str:
+        """Escape special characters for MarkdownV2."""
+        # MarkdownV2 requires escaping these characters: _ * [ ] ( ) ~ ` > # + - = | { } . !
+        import re
+        return re.sub(r'([_*\[\]()~`>#+=|{}.!-])', r'\\\1', text)
+    
+    @staticmethod
+    async def render_blacklist(context: ContextTypes.DEFAULT_TYPE, lang: str, page: int = 0) -> tuple[str, list[list[InlineKeyboardButton]], str | None]:
+        """Build text/keyboard for global blacklist (no I/O side effects)."""
+        from ...infra import db
+        from ...infra.settings_repo import SettingsRepo
         async with db.SessionLocal() as s:  # type: ignore
             cfg = await SettingsRepo(s).get(0, "global_blacklist") or {"words": [], "action": "warn"}
-        
-        words = list(cfg.get("words", []))
+
+        words = sorted(list(cfg.get("words", [])), key=lambda w: str(w).casefold())
         action = cfg.get("action", "warn")
-        
+
         # Pagination settings
         page_size = 20
         start = page * page_size
         end = start + page_size
         displayed_words = words[start:end]
         total_pages = (len(words) + page_size - 1) // page_size if words else 1
-        
-        # Build text list of words
-        text = f"**{t(lang, 'botadm.blacklist.title')} ({len(words)})**\n"
+
+        # Build text list of words - using MarkdownV2
+        title = Navigator.escape_markdown_v2(t(lang, 'botadm.blacklist.title'))
+        text = f"*{title} \\({len(words)}\\)*\n"
         if words:
             text += f"_Page {page + 1} of {total_pages}_\n\n"
-        
+
         if displayed_words:
             for i, word in enumerate(displayed_words, start + 1):
+                # Escape markdown special characters for MarkdownV2
+                escaped_word = Navigator.escape_markdown_v2(word)
                 # Truncate very long words for display
-                display_word = word[:50] + "..." if len(word) > 50 else word
-                text += f"{i}. {display_word}\n"
+                if len(escaped_word) > 50:
+                    display_word = escaped_word[:50] + Navigator.escape_markdown_v2("...")
+                else:
+                    display_word = escaped_word
+                text += f"{i}\\. {display_word}\n"
         elif not words:
-            text += t(lang, "botadm.blacklist.empty")
+            text += Navigator.escape_markdown_v2(t(lang, "botadm.blacklist.empty"))
         else:
-            text += t(lang, "botadm.blacklist.no_items_page")
-        
-        text += f"\n**{t(lang, 'action.current')}:** {t(lang, f'action.{action}')}"
-        
+            text += Navigator.escape_markdown_v2(t(lang, "botadm.blacklist.no_items_page"))
+
+        current_label = Navigator.escape_markdown_v2(t(lang, 'action.current'))
+        action_text = Navigator.escape_markdown_v2(t(lang, f'action.{action}'))
+        text += f"\n*{current_label}:* {action_text}"
+
         rows: list[list[InlineKeyboardButton]] = []
-        
+
         # Pagination buttons
         nav_buttons = []
         if page > 0:
@@ -221,24 +247,24 @@ class Navigator:
             nav_buttons.append(InlineKeyboardButton(f"{page+1}/{total_pages}", callback_data="botadm:noop"))
         if end < len(words):
             nav_buttons.append(InlineKeyboardButton("➡", callback_data=f"botadm:bl:page:{page+1}"))
-        
+
         if nav_buttons:
             rows.append(nav_buttons)
-        
+
         # Management buttons
         if words:
             rows.append([
                 InlineKeyboardButton(t(lang, "botadm.bl.manage"), callback_data="botadm:bl:manage:0"),
                 InlineKeyboardButton(t(lang, "botadm.bl.clear_all"), callback_data="botadm:bl:clear"),
             ])
-        
+
         # Action buttons
         rows.append([
             InlineKeyboardButton(t(lang, "botadm.bl.add"), callback_data="botadm:bl:add"),
             InlineKeyboardButton(t(lang, "botadm.bl.export"), callback_data="botadm:bl:export"),
             InlineKeyboardButton(t(lang, "botadm.bl.import"), callback_data="botadm:bl:import"),
         ])
-        
+
         # Action selection
         rows.append([
             InlineKeyboardButton(
@@ -254,15 +280,11 @@ class Navigator:
                 callback_data="botadm:bl:action:ban"
             ),
         ])
-        
+
         # Back button
         rows.append([InlineKeyboardButton(t(lang, "botadm.back"), callback_data="botadm:nav:home")])
-        
-        await Navigator.edit_or_send(
-            update,
-            text,
-            rows
-        )
+
+        return text, rows, "MarkdownV2"
     
     @staticmethod
     async def go_blacklist_manage(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 0) -> None:
@@ -274,8 +296,9 @@ class Navigator:
         
         async with db.SessionLocal() as s:  # type: ignore
             cfg = await SettingsRepo(s).get(0, "global_blacklist") or {"words": [], "action": "warn"}
-        
-        words = list(cfg.get("words", []))
+
+        # Sort words for stable, predictable order
+        words = sorted(list(cfg.get("words", [])), key=lambda w: str(w).casefold())
         
         # Pagination for management view
         page_size = 10  # Fewer items since we have delete buttons
@@ -284,19 +307,21 @@ class Navigator:
         displayed_words = words[start:end]
         total_pages = (len(words) + page_size - 1) // page_size if words else 1
         
-        text = f"**{t(lang, 'botadm.bl.manage_title')}**\n"
+        title = Navigator.escape_markdown_v2(t(lang, 'botadm.bl.manage_title'))
+        text = f"*{title}*\n"
         text += f"_Page {page + 1} of {total_pages}_\n\n"
-        text += t(lang, "botadm.bl.manage_help")
+        text += Navigator.escape_markdown_v2(t(lang, "botadm.bl.manage_help"))
         
         rows: list[list[InlineKeyboardButton]] = []
         
         # Show words with delete buttons
-        for word in displayed_words:
+        for idx, word in enumerate(displayed_words, start):
             # Truncate for button display
             display_word = word[:25] + "..." if len(word) > 25 else word
             rows.append([
                 InlineKeyboardButton(display_word, callback_data="botadm:noop"),
-                InlineKeyboardButton("🗑", callback_data=f"botadm:bl:del:{word[:50]}")
+                # Use index-based deletion to avoid callback size limits and truncation bugs
+                InlineKeyboardButton("🗑", callback_data=f"botadm:bl:delidx:{page}:{idx}")
             ])
         
         # Pagination
@@ -313,7 +338,7 @@ class Navigator:
         # Back button
         rows.append([InlineKeyboardButton(t(lang, "botadm.back"), callback_data="botadm:nav:blacklist")])
         
-        await Navigator.edit_or_send(update, text, rows, parse_mode="Markdown")
+        await Navigator.edit_or_send(update, text, rows, parse_mode="MarkdownV2")
     
     @staticmethod
     async def go_violators(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -328,22 +353,24 @@ class Navigator:
             violators = await GlobalViolatorsRepo(s).list_violators(limit=20)
         
         if not violators:
-            text = t(lang, "botadm.violators") + "\n\n" + t(lang, "botadm.violators.empty")
+            text = Navigator.escape_markdown_v2(t(lang, "botadm.violators") + "\n\n" + t(lang, "botadm.violators.empty"))
         else:
-            text = t(lang, "botadm.violators.title", count=len(violators)) + "\n\n"
+            text = Navigator.escape_markdown_v2(t(lang, "botadm.violators.title", count=len(violators))) + "\n\n"
             
             for v in violators[:10]:  # Show first 10
                 # Format user info
-                text += t(lang, "botadm.violators.user_id", id=f"`{v.user_id}`") + "\n"
-                text += t(lang, "botadm.violators.action", action=v.action) + "\n"
-                text += t(lang, "botadm.violators.count", count=v.violation_count) + "\n"
+                text += Navigator.escape_markdown_v2(t(lang, "botadm.violators.user_id", id=str(v.user_id))) + "\n"
+                text += f"`{v.user_id}`\n"
+                text += Navigator.escape_markdown_v2(t(lang, "botadm.violators.action", action=v.action)) + "\n"
+                text += Navigator.escape_markdown_v2(t(lang, "botadm.violators.count", count=v.violation_count)) + "\n"
                 
                 # Show matched words
                 if v.matched_words:
-                    words = ", ".join(v.matched_words[:3])
+                    words_list = [Navigator.escape_markdown_v2(w) for w in v.matched_words[:3]]
+                    words = ", ".join(words_list)
                     if len(v.matched_words) > 3:
-                        words += "..."
-                    text += t(lang, "botadm.violators.words", words=words) + "\n"
+                        words += Navigator.escape_markdown_v2("...")
+                    text += Navigator.escape_markdown_v2(t(lang, "botadm.violators.words", words="")) + words + "\n"
                 
                 # Show expiry
                 if v.expires_at:
@@ -354,14 +381,14 @@ class Navigator:
                         time_str = f"{hours}h {mins}m"
                     else:
                         time_str = f"{mins}m"
-                    text += t(lang, "botadm.violators.expires", time=time_str) + "\n"
+                    text += Navigator.escape_markdown_v2(t(lang, "botadm.violators.expires", time=time_str)) + "\n"
                 else:
-                    text += t(lang, "botadm.violators.expires_never") + "\n"
+                    text += Navigator.escape_markdown_v2(t(lang, "botadm.violators.expires_never")) + "\n"
                 
                 text += "\n"
             
             if len(violators) > 10:
-                text += t(lang, "botadm.violators.more", count=len(violators) - 10) + "\n"
+                text += Navigator.escape_markdown_v2(t(lang, "botadm.violators.more", count=len(violators) - 10)) + "\n"
         
         keyboard = [
             [InlineKeyboardButton(t(lang, "botadm.violators.clear_all"), callback_data="botadm:violators:clear_all")],
@@ -369,4 +396,4 @@ class Navigator:
             [InlineKeyboardButton(t(lang, "botadm.back"), callback_data="botadm:nav:home")]
         ]
         
-        await Navigator.edit_or_send(update, text, keyboard, parse_mode="Markdown")
+        await Navigator.edit_or_send(update, text, keyboard, parse_mode="MarkdownV2")

@@ -106,10 +106,56 @@ async def handle_private_message(update: Update, context: ContextTypes.DEFAULT_T
     if update.message and update.message.text and update.message.text.startswith('/'):
         return
     
+    # Check if there's an active operation waiting for input
+    # Bot admin wizards
+    if any([
+        context.user_data.get("botadm_wait_chatid"),
+        context.user_data.get("botadm_wait_content"),
+        context.user_data.get("botadm_wait_word"),
+        context.user_data.get("botadm_wait_import")
+    ]):
+        return  # Let the bot_admin handler process this
+    
+    # Admin panel wizards - check for any await_ keys
+    for key in context.user_data.keys():
+        if isinstance(key, tuple) and len(key) >= 1 and isinstance(key[0], str):
+            if key[0].startswith("await_"):
+                return  # Let the admin_panel handler process this
+        elif isinstance(key, str) and key.startswith("await_"):
+            return  # Active operation
+    
+    # Automations wizards
+    for key in context.user_data.keys():
+        if isinstance(key, tuple) and len(key) >= 1:
+            if key[0] in ["auto2_params", "auto2_panel", "auto2_media"]:
+                return  # Active automation setup
+    
+    # Check if user is bot owner or group admin - they don't need the welcome message
+    user_id = update.effective_user.id
+    
+    # Skip welcome for bot owners
+    if user_id in settings.OWNER_IDS:
+        log.debug(f"Skipping welcome message for bot owner {user_id}")
+        return  # Bot owners don't need instructions
+    
+    # Skip welcome for group admins
+    try:
+        from ..infra import db
+        from ..infra.repos import GroupsRepo
+        
+        async with db.SessionLocal() as session:  # type: ignore
+            groups = await GroupsRepo(session).list_admin_groups(user_id)
+            if groups:
+                log.debug(f"Skipping welcome message for group admin {user_id} (manages {len(groups)} groups)")
+                return  # Group admins don't need instructions
+    except Exception as e:
+        log.error(f"Error checking admin status for {user_id}: {e}")
+        pass  # If check fails, continue to show welcome
+    
     lang = I18N.pick_lang(update, fallback=settings.DEFAULT_LANG)
     bot_name = t(lang, "bot.name")
     
-    # Show welcome message for any non-command message
+    # Show welcome message only for regular users with no active operations
     text = t(lang, "start.private.welcome", bot_name=bot_name)
     
     keyboard = [
