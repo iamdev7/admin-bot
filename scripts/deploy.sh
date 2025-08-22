@@ -11,7 +11,7 @@ IFS=$'\n\t'
 #   scripts/deploy.sh [--dry-run] [--no-push] [--branch BRANCH]
 #                     [--remote USER@HOST] [--key PATH] [--remote-dir PATH]
 # Env overrides:
-#   REPO_URL, GIT_REMOTE, REMOTE, SSH_KEY, REMOTE_DIR, EXCLUDES_FILE
+#   REPO_URL, GIT_REMOTE, REMOTE, SSH_KEY, REMOTE_DIR, EXCLUDES_FILE, REMOTE_PYTHON
 
 REPO_URL_DEFAULT="https://github.com/altmemy/admin-bot.git"
 REPO_URL="${REPO_URL:-$REPO_URL_DEFAULT}"
@@ -179,16 +179,59 @@ remote_bootstrap() {
   read -r -d '' cmd <<EOF || true
 set -Eeuo pipefail
 cd '$REMOTE_DIR'
-if [ ! -d .venv ]; then
-  python3 -m venv .venv || python -m venv .venv
+PYTHON_CAND="${REMOTE_PYTHON:-}"
+
+pick_python() {
+  if [ -n "$PYTHON_CAND" ] && command -v "$PYTHON_CAND" >/dev/null 2>&1; then
+    echo "$PYTHON_CAND"; return 0
+  fi
+  if command -v python3.11 >/dev/null 2>&1; then echo python3.11; return 0; fi
+  if command -v python3 >/dev/null 2>&1 && python3 -c 'import sys;raise SystemExit(0 if sys.version_info>=(3,11) else 1)'; then
+    echo python3; return 0
+  fi
+  return 1
+}
+
+PY_BIN=$(pick_python || true)
+if [ -z "$PY_BIN" ]; then
+  echo "Python >= 3.11 not found. Attempting to install..."
+  if command -v dnf >/dev/null 2>&1; then
+    sudo -n dnf install -y python3.11 python3.11-devel || true
+  elif command -v yum >/dev/null 2>&1; then
+    if command -v amazon-linux-extras >/dev/null 2>&1; then
+      sudo -n amazon-linux-extras enable python3.11 || true
+    fi
+    sudo -n yum install -y python3.11 python3.11-devel || true
+  elif command -v apt-get >/dev/null 2>&1; then
+    sudo -n apt-get update || true
+    sudo -n apt-get install -y python3.11 python3.11-venv python3.11-distutils || true
+  fi
+  if command -v python3.11 >/dev/null 2>&1; then
+    PY_BIN=python3.11
+  else
+    echo "Could not install Python 3.11 automatically. Please install it (e.g., 'sudo dnf install -y python3.11') and rerun."
+    exit 1
+  fi
 fi
+
+# Recreate venv if present but uses <3.11
+if [ -d .venv ]; then
+  if ! .venv/bin/python -c 'import sys; raise SystemExit(0 if sys.version_info>=(3,11) else 1)'; then
+    echo "Existing .venv uses older Python; recreating with $PY_BIN"
+    rm -rf .venv
+  fi
+fi
+
+if [ ! -d .venv ]; then
+  "$PY_BIN" -m venv .venv
+fi
+
 source .venv/bin/activate
 python -m pip install -U pip setuptools wheel
 pip install -e .
 
 if [ -f .env ]; then
   echo "Running DB migrations..."
-  # Avoid printing secrets; .env is read by the app itself
   python -m bot.infra.migrate || {
     echo "Migration failed; please check .env and logs" >&2
     exit 1
