@@ -160,7 +160,10 @@ rsync_sync() {
   if [[ -n "$exclude_arg" ]]; then
     rsync_cmd+=("$exclude_arg")
   fi
-  rsync_cmd+=( -e "ssh ${SSH_OPTS[*]}" ./ "$REMOTE:$REMOTE_DIR/" )
+  # Compose a single remote shell string for rsync (-e). Avoid newlines or array
+  # expansions here to prevent ssh from mis-parsing -i and -o flags.
+  local ssh_e="ssh -i '$SSH_KEY' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=60 -o ServerAliveCountMax=2"
+  rsync_cmd+=( -e "$ssh_e" ./ "$REMOTE:$REMOTE_DIR/" )
 
   if $DRY_RUN; then
     echo "DRY-RUN: ${rsync_cmd[*]}"
@@ -220,4 +223,3 @@ main() {
 }
 
 main "$@"
-
