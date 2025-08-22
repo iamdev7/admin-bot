@@ -170,8 +170,8 @@ class Navigator:
         await Navigator.edit_or_send(update, text, keyboard, parse_mode="Markdown")
     
     @staticmethod
-    async def go_blacklist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Navigate to blacklist management."""
+    async def go_blacklist(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 0) -> None:
+        """Navigate to blacklist management with pagination."""
         from ...infra import db
         from ...infra.settings_repo import SettingsRepo
         
@@ -187,22 +187,49 @@ class Navigator:
         words = list(cfg.get("words", []))
         action = cfg.get("action", "warn")
         
+        # Pagination settings
+        page_size = 20
+        start = page * page_size
+        end = start + page_size
+        displayed_words = words[start:end]
+        total_pages = (len(words) + page_size - 1) // page_size if words else 1
+        
+        # Build text list of words
+        text = f"**{t(lang, 'botadm.blacklist.title')} ({len(words)})**\n"
+        if words:
+            text += f"_Page {page + 1} of {total_pages}_\n\n"
+        
+        if displayed_words:
+            for i, word in enumerate(displayed_words, start + 1):
+                # Truncate very long words for display
+                display_word = word[:50] + "..." if len(word) > 50 else word
+                text += f"{i}. {display_word}\n"
+        elif not words:
+            text += t(lang, "botadm.blacklist.empty")
+        else:
+            text += t(lang, "botadm.blacklist.no_items_page")
+        
+        text += f"\n**{t(lang, 'action.current')}:** {t(lang, f'action.{action}')}"
+        
         rows: list[list[InlineKeyboardButton]] = []
         
-        # Show words with delete buttons (max 20 to leave room for controls)
-        displayed_words = words[:20]
-        for w in displayed_words:
-            # Truncate long words/phrases for display
-            display_text = w if len(w) <= 30 else w[:27] + "..."
-            rows.append([
-                InlineKeyboardButton(display_text, callback_data="botadm:noop"),
-                InlineKeyboardButton("✖", callback_data=f"botadm:bl:del:{w[:50]}")  # Limit callback data
-            ])
+        # Pagination buttons
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("⬅", callback_data=f"botadm:bl:page:{page-1}"))
+        if words:
+            nav_buttons.append(InlineKeyboardButton(f"{page+1}/{total_pages}", callback_data="botadm:noop"))
+        if end < len(words):
+            nav_buttons.append(InlineKeyboardButton("➡", callback_data=f"botadm:bl:page:{page+1}"))
         
-        # Show count if there are more words
-        if len(words) > 20:
+        if nav_buttons:
+            rows.append(nav_buttons)
+        
+        # Management buttons
+        if words:
             rows.append([
-                InlineKeyboardButton(f"... and {len(words) - 20} more", callback_data="botadm:noop")
+                InlineKeyboardButton(t(lang, "botadm.bl.manage"), callback_data="botadm:bl:manage:0"),
+                InlineKeyboardButton(t(lang, "botadm.bl.clear_all"), callback_data="botadm:bl:clear"),
             ])
         
         # Action buttons
@@ -231,18 +258,62 @@ class Navigator:
         # Back button
         rows.append([InlineKeyboardButton(t(lang, "botadm.back"), callback_data="botadm:nav:home")])
         
-        # Create title with word count
-        title = t(lang, "botadm.bl.title", action=action)
-        if words:
-            title += f"\n📊 Total: {len(words)} word(s)/phrase(s)"
-        else:
-            title += "\n📊 List is empty"
-        
         await Navigator.edit_or_send(
             update,
-            title,
+            text,
             rows
         )
+    
+    @staticmethod
+    async def go_blacklist_manage(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 0) -> None:
+        """Show blacklist words with delete buttons for management."""
+        from ...infra import db
+        from ...infra.settings_repo import SettingsRepo
+        
+        lang = I18N.pick_lang(update)
+        
+        async with db.SessionLocal() as s:  # type: ignore
+            cfg = await SettingsRepo(s).get(0, "global_blacklist") or {"words": [], "action": "warn"}
+        
+        words = list(cfg.get("words", []))
+        
+        # Pagination for management view
+        page_size = 10  # Fewer items since we have delete buttons
+        start = page * page_size
+        end = start + page_size
+        displayed_words = words[start:end]
+        total_pages = (len(words) + page_size - 1) // page_size if words else 1
+        
+        text = f"**{t(lang, 'botadm.bl.manage_title')}**\n"
+        text += f"_Page {page + 1} of {total_pages}_\n\n"
+        text += t(lang, "botadm.bl.manage_help")
+        
+        rows: list[list[InlineKeyboardButton]] = []
+        
+        # Show words with delete buttons
+        for word in displayed_words:
+            # Truncate for button display
+            display_word = word[:25] + "..." if len(word) > 25 else word
+            rows.append([
+                InlineKeyboardButton(display_word, callback_data="botadm:noop"),
+                InlineKeyboardButton("🗑", callback_data=f"botadm:bl:del:{word[:50]}")
+            ])
+        
+        # Pagination
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("⬅", callback_data=f"botadm:bl:manage:{page-1}"))
+        nav_buttons.append(InlineKeyboardButton(f"{page+1}/{total_pages}", callback_data="botadm:noop"))
+        if end < len(words):
+            nav_buttons.append(InlineKeyboardButton("➡", callback_data=f"botadm:bl:manage:{page+1}"))
+        
+        if nav_buttons:
+            rows.append(nav_buttons)
+        
+        # Back button
+        rows.append([InlineKeyboardButton(t(lang, "botadm.back"), callback_data="botadm:nav:blacklist")])
+        
+        await Navigator.edit_or_send(update, text, rows, parse_mode="Markdown")
     
     @staticmethod
     async def go_violators(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

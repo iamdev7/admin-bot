@@ -58,7 +58,7 @@ from ...infra.settings_repo import SettingsRepo
 from ...infra.repos import FiltersRepo
 
 
-async def start_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def start_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False) -> None:
     if not update.effective_user or not update.effective_chat:
         return
     if update.effective_chat.type != "private":
@@ -67,15 +67,22 @@ async def start_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     async with db.SessionLocal() as s:  # type: ignore
         groups = await GroupsRepo(s).list_admin_groups(update.effective_user.id)
     if not groups:
-        await update.effective_message.reply_text(t(lang, "panel.no_groups"))
+        if edit and update.callback_query:
+            await update.effective_message.edit_text(t(lang, "panel.no_groups"))
+        else:
+            await update.effective_message.reply_text(t(lang, "panel.no_groups"))
         return
     buttons = [
         [InlineKeyboardButton(g.title, callback_data=f"panel:group:{g.id}:tab:home")]
         for g in groups[:25]
     ]
-    await update.effective_message.reply_text(
-        t(lang, "panel.pick_group"), reply_markup=InlineKeyboardMarkup(buttons)
-    )
+    text = t(lang, "panel.pick_group")
+    markup = InlineKeyboardMarkup(buttons)
+    
+    if edit and update.callback_query:
+        await update.effective_message.edit_text(text, reply_markup=markup)
+    else:
+        await update.effective_message.reply_text(text, reply_markup=markup)
 
 
 @require_admin
@@ -170,28 +177,92 @@ async def list_rules(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: in
     page_size = 10
     start = page * page_size
     items = rules[start : start + page_size]
+    
+    # Build text list of rules
+    text = f"**{t(lang, 'panel.rules.list_title')}**\n\n"
+    
     if not items:
-        return await update.effective_message.edit_text(
-            t(lang, "rules.list.empty"), reply_markup=tabs_keyboard(lang, gid)
+        text += t(lang, "rules.list.empty")
+        await update.effective_message.edit_text(
+            text, reply_markup=tabs_keyboard(lang, gid), parse_mode="Markdown"
         )
-    rows = []
+        return
+    
+    # Display rules as text
     for r in items:
-        label = f"#{r.id} [{r.type}/{r.action}]"
-        rows.append(
-            [
-                InlineKeyboardButton(label, callback_data=f"panel:group:{gid}:rules:cfg:{r.id}"),
-                InlineKeyboardButton("✖", callback_data=f"panel:group:{gid}:rules:del:{r.id}"),
-            ]
-        )
+        pattern_preview = r.pattern[:30] + "..." if len(r.pattern) > 30 else r.pattern
+        text += f"#{r.id} • {r.type} • {r.action}\n"
+        text += f"   Pattern: {pattern_preview}\n\n"
+    
+    if len(rules) > 10:
+        text += f"\n_Showing {start+1}-{min(start+page_size, len(rules))} of {len(rules)} rules_"
+    
+    # Navigation and action buttons
+    rows = []
+    
+    # Add manage button if there are rules
+    if rules:
+        rows.append([
+            InlineKeyboardButton(t(lang, "panel.rules.manage"), callback_data=f"panel:group:{gid}:rules:manage:0")
+        ])
+    
+    # Navigation buttons
     nav = []
     if start > 0:
         nav.append(InlineKeyboardButton("⬅", callback_data=f"panel:group:{gid}:rules:list:{page-1}"))
+    if len(rules) > page_size:
+        nav.append(InlineKeyboardButton(f"{page+1}/{(len(rules)+page_size-1)//page_size}", callback_data="panel:noop"))
     if start + page_size < len(rules):
         nav.append(InlineKeyboardButton("➡", callback_data=f"panel:group:{gid}:rules:list:{page+1}"))
     if nav:
         rows.append(nav)
+    
     rows.append([InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:rules")])
-    await update.effective_message.edit_text(t(lang, "panel.rules.list_title"), reply_markup=InlineKeyboardMarkup(rows))
+    await update.effective_message.edit_text(text, reply_markup=InlineKeyboardMarkup(rows), parse_mode="Markdown")
+
+
+async def manage_rules(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int, page: int) -> None:
+    """Show rules with delete buttons for management."""
+    lang = _panel_lang(update, gid)
+    async with db.SessionLocal() as s:  # type: ignore
+        rules = await FiltersRepo(s).list_rules(gid, limit=200)
+    
+    page_size = 5  # Fewer items since we have delete buttons
+    start = page * page_size
+    items = rules[start : start + page_size]
+    total_pages = (len(rules) + page_size - 1) // page_size if rules else 1
+    
+    text = f"**{t(lang, 'panel.rules.manage_title')}**\n"
+    text += f"_Page {page + 1} of {total_pages}_\n\n"
+    text += t(lang, "panel.rules.manage_help")
+    
+    rows = []
+    
+    # Show rules with delete buttons
+    for r in items:
+        # Truncate pattern for button display
+        pattern_display = r.pattern[:20] + "..." if len(r.pattern) > 20 else r.pattern
+        label = f"#{r.id} {r.type} • {pattern_display}"
+        rows.append([
+            InlineKeyboardButton(label[:30], callback_data="panel:noop"),
+            InlineKeyboardButton("🗑", callback_data=f"panel:group:{gid}:rules:del:{r.id}")
+        ])
+    
+    # Navigation
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton("⬅", callback_data=f"panel:group:{gid}:rules:manage:{page-1}"))
+    nav.append(InlineKeyboardButton(f"{page+1}/{total_pages}", callback_data="panel:noop"))
+    if start + page_size < len(rules):
+        nav.append(InlineKeyboardButton("➡", callback_data=f"panel:group:{gid}:rules:manage:{page+1}"))
+    
+    if nav:
+        rows.append(nav)
+    
+    # Back button
+    rows.append([InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:rules:list:0")])
+    
+    await update.effective_message.edit_text(text, reply_markup=InlineKeyboardMarkup(rows), parse_mode="Markdown")
 
 
 async def rules_add_pick_type(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
@@ -231,7 +302,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     parts = data.split(":")
     lang = I18N.pick_lang(update)
     if data == "panel:back":
-        return await start_panel(update, context)
+        return await start_panel(update, context, edit=True)
     if len(parts) >= 4 and parts[0] == "panel" and parts[1] == "group":
         gid = int(parts[2])
         user_id = update.effective_user.id if update.effective_user else 0
@@ -310,6 +381,9 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             if len(parts) == 6 and parts[4] == "list":
                 page = int(parts[5])
                 return await list_rules(update, context, gid, page)
+            if len(parts) == 6 and parts[4] == "manage":
+                page = int(parts[5])
+                return await manage_rules(update, context, gid, page)
             if len(parts) == 5 and parts[4] == "edittext":
                 context.user_data[("await_rules", gid)] = True
                 return await update.effective_message.reply_text(t(lang, "panel.rules.prompt"))
@@ -1245,6 +1319,24 @@ async def show_automations(update: Update, context: ContextTypes.DEFAULT_TYPE, g
     async with db.SessionLocal() as s:  # type: ignore
         from ...infra.repos import JobsRepo
         jobs = await JobsRepo(s).list_by_group(gid, limit=50)
+    
+    # Build text list of automations
+    text = f"**{t(lang, 'panel.automations')}**\n\n"
+    
+    if jobs:
+        for j in jobs[:20]:  # Show first 20 as text
+            next_label = j.run_at.replace(tzinfo=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            paused = bool(isinstance(j.payload, dict) and j.payload.get("paused"))
+            status = "⏸ Paused" if paused else "✅ Active"
+            text += f"#{j.id} • {j.kind} • {status}\n"
+            text += f"   Next run: {next_label}\n\n"
+        
+        if len(jobs) > 20:
+            text += f"\n_... and {len(jobs) - 20} more automations_\n"
+    else:
+        text += t(lang, "panel.auto.empty")
+    
+    # Keep only action buttons, not job buttons
     rows: list[list[InlineKeyboardButton]] = []
     rows.append([InlineKeyboardButton(t(lang, "panel.auto.add_announce"), callback_data=f"panel:group:{gid}:auto2:announce")])
     rows.append([InlineKeyboardButton(t(lang, "panel.auto.add_pin"), callback_data=f"panel:group:{gid}:auto2:pin")])
@@ -1252,17 +1344,8 @@ async def show_automations(update: Update, context: ContextTypes.DEFAULT_TYPE, g
         InlineKeyboardButton(t(lang, "panel.auto.add_unmute"), callback_data=f"panel:group:{gid}:auto2:unmute"),
         InlineKeyboardButton(t(lang, "panel.auto.add_unban"), callback_data=f"panel:group:{gid}:auto2:unban"),
     ])
-    for j in jobs[:10]:
-        next_label = j.run_at.replace(tzinfo=timezone.utc).isoformat()
-        paused = bool(isinstance(j.payload, dict) and j.payload.get("paused"))
-        label = f"#{j.id} {j.kind}{' ⏸' if paused else ''} • next: {next_label}"
-        rows.append([
-            InlineKeyboardButton(label, callback_data="panel:noop"),
-            InlineKeyboardButton("⏯" if paused else "⏸", callback_data=f"panel:group:{gid}:auto:toggle:{j.id}"),
-            InlineKeyboardButton("✖", callback_data=f"panel:group:{gid}:auto:cancel:{j.id}"),
-        ])
     rows.append([InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:home")])
-    await update.effective_message.edit_text(t(lang, "panel.auto.title"), reply_markup=InlineKeyboardMarkup(rows))
+    await update.effective_message.edit_text(text, reply_markup=InlineKeyboardMarkup(rows), parse_mode="Markdown")
 
 
 # ----- Automations v2 (wizard) -----

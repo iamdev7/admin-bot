@@ -130,6 +130,23 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     await SettingsRepo(s).set(0, "global_blacklist", cfg)
                     await s.commit()
             return await Navigator.go_blacklist(update, context)
+        elif len(data) >= 3 and data[2] == "page" and len(data) >= 4:
+            # Handle pagination
+            page = int(data[3])
+            return await Navigator.go_blacklist(update, context, page=page)
+        elif len(data) >= 3 and data[2] == "manage":
+            # Handle manage view navigation
+            page = int(data[3]) if len(data) >= 4 else 0
+            return await Navigator.go_blacklist_manage(update, context, page=page)
+        elif len(data) >= 3 and data[2] == "clear":
+            # Clear all words with confirmation
+            async with db.SessionLocal() as s:  # type: ignore
+                cfg = await SettingsRepo(s).get(0, "global_blacklist") or {"words": [], "action": "warn"}
+                cfg["words"] = []
+                await SettingsRepo(s).set(0, "global_blacklist", cfg)
+                await s.commit()
+            await update.effective_message.answer(t(lang, "botadm.bl.cleared"))
+            return await Navigator.go_blacklist(update, context)
         elif len(data) >= 3 and data[2] == "del" and len(data) >= 4:
             word = data[3]
             async with db.SessionLocal() as s:  # type: ignore
@@ -138,7 +155,9 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 cfg["words"] = words
                 await SettingsRepo(s).set(0, "global_blacklist", cfg)
                 await s.commit()
-            return await Navigator.go_blacklist(update, context)
+            # Return to manage view at the same page
+            page = 0  # Could track page in context if needed
+            return await Navigator.go_blacklist_manage(update, context, page=page)
     
     # Handle violators callbacks
     if data[1] == "violators":

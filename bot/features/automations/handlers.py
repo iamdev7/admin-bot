@@ -78,7 +78,10 @@ async def run_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             if success and isinstance(j.payload, dict) and j.payload.get("notify"):
                 n = j.payload.get("notify")
                 try:
-                    await context.bot.send_message(n.get("chat_id"), "✅ Announcement sent.")
+                    from ...core.i18n import I18N, t
+                    # Get language for the notification chat (usually admin's private chat)
+                    lang = I18N.get_group_lang(j.group_id) or 'en'
+                    await context.bot.send_message(n.get("chat_id"), t(lang, "panel.auto.announcement_sent"))
                 except Exception as e:
                     log.exception("automation.announce notify failed id=%s: %s", j.id, e)
                 # Clear notify after first run
