@@ -39,57 +39,57 @@ async def generate_help_text(update: Update, context: ContextTypes.DEFAULT_TYPE,
     
     # Build help text based on permissions
     parts = []
-    parts.append(f"📚 <b>{t(lang, 'bot.name')}</b> - {t(lang, 'help.title', 'Commands')}\n")
+    parts.append(f"📚 <b>{t(lang, 'bot.name')}</b> - {t(lang, 'help.title')}\n")
     
     # Basic commands everyone can use
-    parts.append("<b>📱 Basic Commands:</b>")
-    parts.append("/start - Welcome message")
-    parts.append("/help - This help message")
-    parts.append("/panel - Group management (if admin)")
+    parts.append(f"<b>{t(lang, 'help.section.basic')}</b>")
+    parts.append(t(lang, "help.cmd.start"))
+    parts.append(t(lang, "help.cmd.help"))
+    parts.append(t(lang, "help.cmd.panel"))
     parts.append("")
     
     # Group admin commands
     if is_group_admin:
-        parts.append("<b>👮 Admin Commands (in groups):</b>")
-        parts.append("/warn @user - Warn a user")
-        parts.append("/unwarn @user - Remove warnings")
-        parts.append("/mute @user [time] - Mute a user")
-        parts.append("/unmute @user - Unmute a user")
-        parts.append("/ban @user - Ban a user")
-        parts.append("/unban @user - Unban a user")
-        parts.append("/purge - Delete messages")
-        parts.append("/rules - Show group rules")
-        parts.append("/setrules - Set group rules")
-        parts.append("/settings - Open settings panel")
+        parts.append(f"<b>{t(lang, 'help.section.admin')}</b>")
+        parts.append(t(lang, "help.cmd.warn"))
+        parts.append(t(lang, "help.cmd.unwarn"))
+        parts.append(t(lang, "help.cmd.mute"))
+        parts.append(t(lang, "help.cmd.unmute"))
+        parts.append(t(lang, "help.cmd.ban"))
+        parts.append(t(lang, "help.cmd.unban"))
+        parts.append(t(lang, "help.cmd.purge"))
+        parts.append(t(lang, "help.cmd.rules"))
+        parts.append(t(lang, "help.cmd.setrules"))
+        parts.append(t(lang, "help.cmd.settings"))
         parts.append("")
         
         if admin_groups:
-            parts.append(f"<b>📋 Your Groups ({len(admin_groups)}):</b>")
+            parts.append(f"<b>{t(lang, 'help.section.groups', count=len(admin_groups))}</b>")
             for group in admin_groups:
                 parts.append(f"• {group.title}")
             parts.append("")
     
     # Bot owner commands
     if is_owner:
-        parts.append("<b>🔐 Bot Owner Commands:</b>")
-        parts.append("/bot - Bot admin panel")
-        parts.append("/backup - Create database backup")
-        parts.append("/broadcast - Send announcement")
+        parts.append(f"<b>{t(lang, 'help.section.owner')}</b>")
+        parts.append(t(lang, "help.cmd.bot"))
+        parts.append(t(lang, "help.cmd.backup"))
+        parts.append(t(lang, "help.cmd.broadcast"))
         parts.append("")
     
     # Tips section
-    parts.append("<b>💡 Tips:</b>")
+    parts.append(f"<b>{t(lang, 'help.section.tips')}</b>")
     if not is_group_admin:
-        parts.append("• Add me to your group as admin")
-        parts.append("• Use /panel to manage your groups")
+        parts.append(t(lang, "help.tip.add_bot"))
+        parts.append(t(lang, "help.tip.use_panel"))
     else:
-        parts.append("• Use /panel in private for full control")
-        parts.append("• Configure anti-spam settings")
-        parts.append("• Set welcome messages and rules")
+        parts.append(t(lang, "help.tip.panel_private"))
+        parts.append(t(lang, "help.tip.antispam"))
+        parts.append(t(lang, "help.tip.welcome"))
     
     parts.append("")
-    parts.append(f"👨‍💻 Developer: <b>Al-Tamimi</b>")
-    parts.append(f"📢 Updates: @codei8")
+    parts.append(t(lang, "help.developer"))
+    parts.append(t(lang, "help.channel"))
     
     return "\n".join(parts)
 
