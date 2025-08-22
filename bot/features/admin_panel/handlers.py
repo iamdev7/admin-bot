@@ -11,6 +11,24 @@ from ...core.i18n import I18N, t
 import logging
 log = logging.getLogger(__name__)
 
+
+async def safe_edit_message(update: Update, text: str, reply_markup=None, parse_mode=None):
+    """Safely edit a message, handling the case where content hasn't changed."""
+    try:
+        return await update.effective_message.edit_text(
+            text, 
+            reply_markup=reply_markup, 
+            parse_mode=parse_mode
+        )
+    except Exception as e:
+        if "Message is not modified" in str(e):
+            if update.callback_query:
+                await update.callback_query.answer("✓", show_alert=False)
+            return None
+        else:
+            raise
+
+
 def _panel_lang(update, gid: int | None) -> str:
     try:
         if gid is not None:
@@ -181,10 +199,12 @@ async def list_rules(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: in
     # Build text list of rules
     text = f"**{t(lang, 'panel.rules.list_title')}**\n\n"
     
-    if not items:
+    if not items and page == 0:
         text += t(lang, "rules.list.empty")
+        # Show back button to rules menu
+        kb = [[InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:rules")]]
         await update.effective_message.edit_text(
-            text, reply_markup=tabs_keyboard(lang, gid), parse_mode="Markdown"
+            text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown"
         )
         return
     
@@ -405,8 +425,8 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 async with db.SessionLocal() as s:  # type: ignore
                     ok = await FiltersRepo(s).delete_rule(gid, rid)
                     await s.commit()
-                await update.effective_message.reply_text(t(lang, "rules.del.ok" if ok else "rules.del.missing"))
-                return await list_rules(update, context, gid, page=0)
+                # Don't reply with a separate message, just refresh the list
+                return await manage_rules(update, context, gid, page=0)
             if len(parts) == 6 and parts[4] == "cfg":
                 rid = int(parts[5])
                 return await rule_config(update, context, gid, rid)
@@ -545,6 +565,24 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 return await show_links(update, context, gid)
             if parts[4] == "night" and len(parts) >= 6 and parts[5] == "open":
                 return await show_links_night(update, context, gid)
+            # Handle type action changes first (more specific)
+            if parts[4] == "type" and len(parts) >= 7 and parts[5] in {"invites", "telegram", "shorteners", "usernames", "other"}:
+                cat = parts[5]
+                action = parts[6]
+                if action in {"default", "allow", "delete", "warn", "mute", "ban"}:
+                    async with db.SessionLocal() as s:  # type: ignore
+                        cfg = await SettingsRepo(s).get(gid, "links") or {"types": {}}
+                        types = cfg.get("types", {})
+                        if action == "default":
+                            # Remove the specific setting to use default
+                            types.pop(cat, None)
+                        else:
+                            types[cat] = action
+                        cfg["types"] = types
+                        await SettingsRepo(s).set(gid, "links", cfg)
+                        await s.commit()
+                    return await show_links_type_actions(update, context, gid)
+            # Handle type panel open (less specific)
             if parts[4] == "type" and (len(parts) == 5 or (len(parts) >= 6 and parts[5] == "open")):
                 return await show_links_type_actions(update, context, gid)
             if parts[4] == "toggle_block":
@@ -602,21 +640,10 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     await SettingsRepo(s).set(gid, "links.night", night)
                     await s.commit()
                 return await show_links_night(update, context, gid)
-            if parts[4] == "type" and len(parts) >= 7 and parts[5] in {"invites", "telegram", "shorteners", "other"}:
-                cat = parts[5]
-                action = parts[6]
-                if action in {"allow", "delete", "warn", "mute", "ban"}:
-                    async with db.SessionLocal() as s:  # type: ignore
-                        cfg = await SettingsRepo(s).get(gid, "links") or {"types": {}}
-                        types = cfg.get("types", {})
-                        types[cat] = action
-                        cfg["types"] = types
-                        await SettingsRepo(s).set(gid, "links", cfg)
-                        await s.commit()
-                    return await show_links_type_actions(update, context, gid)
             if parts[4] == "add":
                 context.user_data[("await_link_domain", gid)] = True
                 lang = I18N.pick_lang(update)
+                await update.callback_query.answer()
                 return await update.effective_message.reply_text(t(lang, "panel.links.add_prompt"))
             if parts[4] == "del" and len(parts) >= 6:
                 dom = parts[5]
@@ -633,6 +660,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 if parts[5] == "add":
                     context.user_data[("await_link_allow_domain", gid)] = True
                     lang = I18N.pick_lang(update)
+                    await update.callback_query.answer()
                     return await update.effective_message.reply_text(t(lang, "panel.links.allow_add_prompt"))
                 if parts[5] == "del" and len(parts) >= 7:
                     dom = parts[6]
@@ -847,8 +875,9 @@ async def on_rules_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     async with db.SessionLocal() as s:  # type: ignore
                         f = await FiltersRepo(s).add_rule(gid, ftype, pattern, action, update.effective_user.id)  # type: ignore
                         await s.commit()
+                        rule_id = f.id if f else 0
                     lang = I18N.pick_lang(update)
-                    await update.effective_message.reply_text(t(lang, "rules.add.ok", id=f.id))
+                    await update.effective_message.reply_text(t(lang, "rules.add.ok", id=rule_id))
                     context.user_data[(k, gid)] = False
                     return
         if k == "await_reply_text" and isinstance(payload, dict):
@@ -1154,14 +1183,7 @@ async def show_onboarding(update: Update, context: ContextTypes.DEFAULT_TYPE, gi
         ],
         [InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:home")],
     ]
-    try:
-        await update.effective_message.edit_text(label, reply_markup=InlineKeyboardMarkup(kb))
-    except Exception as e:
-        if "Message is not modified" in str(e):
-            # Message content hasn't changed, show a small notification
-            await update.callback_query.answer("Settings updated ✓", show_alert=False)
-        else:
-            raise
+    await safe_edit_message(update, label, reply_markup=InlineKeyboardMarkup(kb))
 
 
 async def show_moderation(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
@@ -1199,59 +1221,143 @@ async def show_links(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: in
     deny = list(cfg.get("denylist", []))
     block_all = bool(cfg.get("block_all", False))
     action = cfg.get("action", "delete")
-    rows = [
-        [InlineKeyboardButton(t(lang, "panel.links.toggle_block_all"), callback_data=f"panel:group:{gid}:links:toggle_block")],
-        [
-            InlineKeyboardButton(t(lang, "action.delete"), callback_data=f"panel:group:{gid}:links:action:delete"),
-            InlineKeyboardButton(t(lang, "action.warn"), callback_data=f"panel:group:{gid}:links:action:warn"),
-            InlineKeyboardButton(t(lang, "action.mute"), callback_data=f"panel:group:{gid}:links:action:mute"),
-            InlineKeyboardButton(t(lang, "action.ban"), callback_data=f"panel:group:{gid}:links:action:ban"),
-        ],
-        [InlineKeyboardButton(t(lang, "panel.links.type_actions"), callback_data=f"panel:group:{gid}:links:type:open")],
-        [InlineKeyboardButton(t(lang, "panel.links.night"), callback_data=f"panel:group:{gid}:links:night:open")],
-        [InlineKeyboardButton(t(lang, "panel.links.add"), callback_data=f"panel:group:{gid}:links:add")],
-        [InlineKeyboardButton(t(lang, "panel.links.allow_add"), callback_data=f"panel:group:{gid}:links:allow:add")],
-    ]
-    # list deny domains with delete buttons
-    for d in deny[:6]:
-        rows.append([InlineKeyboardButton(d, callback_data="panel:noop"), InlineKeyboardButton("✖", callback_data=f"panel:group:{gid}:links:del:{d}")])
-    # list allow domains with delete buttons
     allow = list(cfg.get("allowlist", []))
+    
+    # Build text with current settings
+    text = f"**{t(lang, 'panel.links.title')}**\n\n"
+    text += f"🔗 **Block All Links:** {'✅ ON' if block_all else '❌ OFF'}\n"
+    text += f"⚡ **Default Action:** {action.upper()}\n"
+    text += f"🌙 **Night Mode:** {'✅ ON' if night.get('enabled') else '❌ OFF'}\n"
+    
+    # Show type-specific overrides if any
+    types = cfg.get("types", {})
+    has_overrides = any(types.get(cat) and types.get(cat) != "default" for cat in ["invites", "telegram", "shorteners", "other"])
+    if has_overrides:
+        text += f"🎯 **Type Overrides:** Active\n"
+    
+    if deny:
+        text += f"🚫 **Blocked Domains:** {len(deny)}\n"
     if allow:
-        rows.append([InlineKeyboardButton(t(lang, "panel.links.allowlist"), callback_data="panel:noop")])
+        text += f"✅ **Allowed Domains:** {len(allow)}\n"
+    text += "\n"
+    
+    rows = [
+        [InlineKeyboardButton(
+            ("🔴 Disable" if block_all else "🟢 Enable") + " Block All Links", 
+            callback_data=f"panel:group:{gid}:links:toggle_block"
+        )],
+        [InlineKeyboardButton("⚡ Default Action", callback_data="panel:noop")],
+        [
+            InlineKeyboardButton(("✅ " if action == "delete" else "") + t(lang, "action.delete"), callback_data=f"panel:group:{gid}:links:action:delete"),
+            InlineKeyboardButton(("✅ " if action == "warn" else "") + t(lang, "action.warn"), callback_data=f"panel:group:{gid}:links:action:warn"),
+            InlineKeyboardButton(("✅ " if action == "mute" else "") + t(lang, "action.mute"), callback_data=f"panel:group:{gid}:links:action:mute"),
+            InlineKeyboardButton(("✅ " if action == "ban" else "") + t(lang, "action.ban"), callback_data=f"panel:group:{gid}:links:action:ban"),
+        ],
+        [InlineKeyboardButton("🎯 " + t(lang, "panel.links.type_actions"), callback_data=f"panel:group:{gid}:links:type:open")],
+        [InlineKeyboardButton("🌙 " + t(lang, "panel.links.night"), callback_data=f"panel:group:{gid}:links:night:open")],
+        [
+            InlineKeyboardButton("➕ " + t(lang, "panel.links.add"), callback_data=f"panel:group:{gid}:links:add"),
+            InlineKeyboardButton("✅ " + t(lang, "panel.links.allow_add"), callback_data=f"panel:group:{gid}:links:allow:add"),
+        ],
+    ]
+    
+    # List blocked domains with delete buttons
+    if deny:
+        rows.append([InlineKeyboardButton("🚫 Blocked Domains:", callback_data="panel:noop")])
+        for d in deny[:6]:
+            rows.append([
+                InlineKeyboardButton(f"🔴 {d}", callback_data="panel:noop"), 
+                InlineKeyboardButton("🗑", callback_data=f"panel:group:{gid}:links:del:{d}")
+            ])
+        if len(deny) > 6:
+            rows.append([InlineKeyboardButton(f"... and {len(deny) - 6} more", callback_data="panel:noop")])
+    
+    # List allowed domains with delete buttons
+    if allow:
+        rows.append([InlineKeyboardButton("✅ Allowed Domains:", callback_data="panel:noop")])
         for a in allow[:6]:
-            rows.append([InlineKeyboardButton(a, callback_data="panel:noop"), InlineKeyboardButton("✖", callback_data=f"panel:group:{gid}:links:allow:del:{a}")])
-    rows.append([InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:rules")])
-    action_label = t(lang, f"action.{action}") if action else ""
-    text = t(lang, "panel.links.title") + f"\nBlock all: {'ON' if block_all else 'OFF'}\nDefault: {action_label}"
-    await update.effective_message.edit_text(text, reply_markup=InlineKeyboardMarkup(rows))
+            rows.append([
+                InlineKeyboardButton(f"🟢 {a}", callback_data="panel:noop"), 
+                InlineKeyboardButton("🗑", callback_data=f"panel:group:{gid}:links:allow:del:{a}")
+            ])
+        if len(allow) > 6:
+            rows.append([InlineKeyboardButton(f"... and {len(allow) - 6} more", callback_data="panel:noop")])
+    
+    rows.append([InlineKeyboardButton("⬅ " + t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:rules")])
+    await safe_edit_message(update, text, reply_markup=InlineKeyboardMarkup(rows), parse_mode="Markdown")
 
 
 async def show_links_type_actions(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
     lang = _panel_lang(update, gid)
     async with db.SessionLocal() as s:  # type: ignore
-        cfg = await SettingsRepo(s).get(gid, "links") or {"types": {}}
+        cfg = await SettingsRepo(s).get(gid, "links") or {"types": {}, "action": "delete"}
+    
     types = cfg.get("types", {})
+    default_action = cfg.get("action", "delete")  # Get the default action from main links config
+    
     cats = [
-        ("invites", t(lang, "panel.links.cat.invites")),
-        ("telegram", t(lang, "panel.links.cat.telegram")),
-        ("shorteners", t(lang, "panel.links.cat.shorteners")),
-        ("other", t(lang, "panel.links.cat.other")),
+        ("invites", t(lang, "panel.links.cat.invites"), "💌", "Telegram group/channel invites"),
+        ("telegram", t(lang, "panel.links.cat.telegram"), "✈️", "t.me links"),
+        ("usernames", t(lang, "panel.links.cat.usernames"), "👤", "@usernames and mentions"),
+        ("shorteners", t(lang, "panel.links.cat.shorteners"), "🔗", "URL shorteners (bit.ly, etc)"),
+        ("other", t(lang, "panel.links.cat.other"), "🌐", "All other links"),
     ]
+    
+    # Build text with current settings
+    text = f"**{t(lang, 'panel.links.type_actions')}**\n\n"
+    text += f"📌 **Default Action:** {default_action.upper()}\n"
+    text += "_Configure specific actions for different link types:_\n\n"
+    
+    for cat_id, cat_label, emoji, description in cats:
+        act = types.get(cat_id, "default")  # Show "default" if not specifically set
+        if act == "default":
+            display_action = f"DEFAULT ({default_action.upper()})"
+        else:
+            display_action = act.upper()
+        text += f"{emoji} **{cat_label}:** {display_action}\n"
+    
+    text += "\n_Note: 'Default' uses the main action from Links Policy_"
+    
     rows = []
-    for key, label in cats:
-        rows.append([InlineKeyboardButton(label, callback_data="panel:noop")])
-        rows.append(
-            [
-                InlineKeyboardButton(t(lang, "action.allow"), callback_data=f"panel:group:{gid}:links:type:{key}:allow"),
-                InlineKeyboardButton(t(lang, "action.delete"), callback_data=f"panel:group:{gid}:links:type:{key}:delete"),
-                InlineKeyboardButton(t(lang, "action.warn"), callback_data=f"panel:group:{gid}:links:type:{key}:warn"),
-                InlineKeyboardButton(t(lang, "action.mute"), callback_data=f"panel:group:{gid}:links:type:{key}:mute"),
-                InlineKeyboardButton(t(lang, "action.ban"), callback_data=f"panel:group:{gid}:links:type:{key}:ban"),
-            ]
-        )
-    rows.append([InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:links:open")])
-    await update.effective_message.edit_text(t(lang, "panel.links.type_actions"), reply_markup=InlineKeyboardMarkup(rows))
+    for key, label, emoji, description in cats:
+        current_action = types.get(key, "default")
+        
+        # Display the category with its current setting
+        if current_action == "default":
+            display_text = f"{emoji} {label}: DEFAULT ({default_action.upper()})"
+        else:
+            display_text = f"{emoji} {label}: {current_action.upper()}"
+        
+        rows.append([InlineKeyboardButton(display_text, callback_data="panel:noop")])
+        
+        # Action buttons with checkmarks
+        action_row = []
+        
+        # Add "Use Default" option
+        if current_action == "default":
+            action_row.append(InlineKeyboardButton("✅ Default", callback_data=f"panel:group:{gid}:links:type:{key}:default"))
+        else:
+            action_row.append(InlineKeyboardButton("Default", callback_data=f"panel:group:{gid}:links:type:{key}:default"))
+        
+        # Add specific action options
+        for action in ["allow", "delete", "warn", "mute", "ban"]:
+            if current_action == action:
+                btn_text = f"✅ {t(lang, f'action.{action}')}"
+            else:
+                btn_text = t(lang, f"action.{action}")
+            
+            # Limit buttons per row for better display
+            if len(action_row) >= 3:
+                rows.append(action_row)
+                action_row = []
+            
+            action_row.append(InlineKeyboardButton(btn_text, callback_data=f"panel:group:{gid}:links:type:{key}:{action}"))
+        
+        if action_row:
+            rows.append(action_row)
+    
+    rows.append([InlineKeyboardButton("⬅ " + t(lang, "panel.back"), callback_data=f"panel:group:{gid}:links:open")])
+    await safe_edit_message(update, text, reply_markup=InlineKeyboardMarkup(rows), parse_mode="Markdown")
 
 
 async def show_links_night(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
@@ -1284,28 +1390,49 @@ async def show_locks(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: in
     forwards = locks.get("forwards", "allow")
     media = locks.get("media", {})
     media_types = ["photo", "video", "document", "sticker", "voice", "audio", "animation"]
-    rows = [
-        [InlineKeyboardButton(t(lang, "panel.locks.forwards"), callback_data="panel:noop")],
-        [
-            InlineKeyboardButton(t(lang, "action.allow"), callback_data=f"panel:group:{gid}:locks:forwards:allow"),
-            InlineKeyboardButton(t(lang, "action.delete"), callback_data=f"panel:group:{gid}:locks:forwards:delete"),
-            InlineKeyboardButton(t(lang, "action.warn"), callback_data=f"panel:group:{gid}:locks:forwards:warn"),
-            InlineKeyboardButton(t(lang, "action.mute"), callback_data=f"panel:group:{gid}:locks:forwards:mute"),
-            InlineKeyboardButton(t(lang, "action.ban"), callback_data=f"panel:group:{gid}:locks:forwards:ban"),
-        ],
-        [InlineKeyboardButton(t(lang, "panel.locks.media"), callback_data="panel:noop")],
-    ]
+    
+    # Build text with current settings
+    text = f"**{t(lang, 'panel.locks.title')}**\n\n"
+    text += f"**Forwards:** {forwards.upper()}\n"
     for mt in media_types:
-        rows.append([InlineKeyboardButton(mt, callback_data="panel:noop")])
+        action = media.get(mt, "allow")
+        text += f"**{mt.capitalize()}:** {action.upper()}\n"
+    
+    rows = [
+        [InlineKeyboardButton(f"📤 {t(lang, 'panel.locks.forwards')}", callback_data="panel:noop")],
+        [
+            InlineKeyboardButton(("✅ " if forwards == "allow" else "") + t(lang, "action.allow"), callback_data=f"panel:group:{gid}:locks:forwards:allow"),
+            InlineKeyboardButton(("✅ " if forwards == "delete" else "") + t(lang, "action.delete"), callback_data=f"panel:group:{gid}:locks:forwards:delete"),
+            InlineKeyboardButton(("✅ " if forwards == "warn" else "") + t(lang, "action.warn"), callback_data=f"panel:group:{gid}:locks:forwards:warn"),
+            InlineKeyboardButton(("✅ " if forwards == "mute" else "") + t(lang, "action.mute"), callback_data=f"panel:group:{gid}:locks:forwards:mute"),
+            InlineKeyboardButton(("✅ " if forwards == "ban" else "") + t(lang, "action.ban"), callback_data=f"panel:group:{gid}:locks:forwards:ban"),
+        ],
+        [InlineKeyboardButton(f"🎨 {t(lang, 'panel.locks.media')}", callback_data="panel:noop")],
+    ]
+    
+    # Add media type controls with visual indicators
+    for mt in media_types:
+        current_action = media.get(mt, "allow")
+        emoji_map = {
+            "photo": "🖼",
+            "video": "🎥", 
+            "document": "📎",
+            "sticker": "🎭",
+            "voice": "🎤",
+            "audio": "🎵",
+            "animation": "🎬"
+        }
+        emoji = emoji_map.get(mt, "📁")
+        rows.append([InlineKeyboardButton(f"{emoji} {mt.capitalize()}: {current_action.upper()}", callback_data="panel:noop")])
         rows.append([
-            InlineKeyboardButton(t(lang, "action.allow"), callback_data=f"panel:group:{gid}:locks:media:{mt}:allow"),
-            InlineKeyboardButton(t(lang, "action.delete"), callback_data=f"panel:group:{gid}:locks:media:{mt}:delete"),
-            InlineKeyboardButton(t(lang, "action.warn"), callback_data=f"panel:group:{gid}:locks:media:{mt}:warn"),
-            InlineKeyboardButton(t(lang, "action.mute"), callback_data=f"panel:group:{gid}:locks:media:{mt}:mute"),
-            InlineKeyboardButton(t(lang, "action.ban"), callback_data=f"panel:group:{gid}:locks:media:{mt}:ban"),
+            InlineKeyboardButton(("✅ " if current_action == "allow" else "") + t(lang, "action.allow"), callback_data=f"panel:group:{gid}:locks:media:{mt}:allow"),
+            InlineKeyboardButton(("✅ " if current_action == "delete" else "") + t(lang, "action.delete"), callback_data=f"panel:group:{gid}:locks:media:{mt}:delete"),
+            InlineKeyboardButton(("✅ " if current_action == "warn" else "") + t(lang, "action.warn"), callback_data=f"panel:group:{gid}:locks:media:{mt}:warn"),
+            InlineKeyboardButton(("✅ " if current_action == "mute" else "") + t(lang, "action.mute"), callback_data=f"panel:group:{gid}:locks:media:{mt}:mute"),
+            InlineKeyboardButton(("✅ " if current_action == "ban" else "") + t(lang, "action.ban"), callback_data=f"panel:group:{gid}:locks:media:{mt}:ban"),
         ])
     rows.append([InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:rules")])
-    await update.effective_message.edit_text(t(lang, "panel.locks.title"), reply_markup=InlineKeyboardMarkup(rows))
+    await safe_edit_message(update, text, reply_markup=InlineKeyboardMarkup(rows), parse_mode="Markdown")
 
 
 async def show_recent_violators(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:

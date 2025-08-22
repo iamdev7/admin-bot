@@ -1,0 +1,130 @@
+2025-08-23 00:00:15 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-23 00:00:16 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-23 00:00:16 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-23 00:00:16 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-23 00:00:16 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-23 00:00:16 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-23 00:00:16 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-23 00:00:16 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-23 00:00:17 [INFO] bot.features.antispam.handlers (handlers.py:393) - Found usernames in message: ['@altmemy19']
+2025-08-23 00:00:17 [INFO] bot.features.antispam.handlers (handlers.py:444) - Checking username: @altmemy19
+2025-08-23 00:00:17 [INFO] bot.features.antispam.handlers (handlers.py:490) - Adding @altmemy19 to filtered list for policy check
+2025-08-23 00:00:17 [INFO] bot.features.antispam.handlers (handlers.py:528) - Processing filtered usernames: ['@altmemy19']
+2025-08-23 00:00:17 [INFO] bot.features.antispam.handlers (handlers.py:532) - Username policy for @altmemy19: None
+2025-08-23 00:00:17 [INFO] bot.features.antispam.handlers (handlers.py:543) - Block all is enabled, action for @altmemy19: warn
+2025-08-23 00:00:17 [INFO] bot.features.antispam.handlers (handlers.py:550) - Taking action: warn for user 7656238434
+2025-08-23 00:01:16 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-23 00:01:16 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250822_220116.db
+2025-08-23 00:01:16 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250822_220116.db.gz (compressed 96.0%, 68.0 KB → 2.7 KB)
+2025-08-23 00:01:16 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-23 00:01:16 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-23 00:01:16 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-23 00:06:24 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-23 00:06:24 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-23 00:06:24 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-23 00:06:24 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-23 00:06:24 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-23 00:06:24 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-23 00:06:24 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-23 00:06:24 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-23 00:06:36 [INFO] bot.features.antispam.handlers (handlers.py:393) - Found usernames in message: ['@altmemy19']
+2025-08-23 00:06:36 [INFO] bot.features.antispam.handlers (handlers.py:444) - Checking username: @altmemy19
+2025-08-23 00:06:36 [INFO] bot.features.antispam.handlers (handlers.py:464) - Looking up username altmemy19 in database
+2025-08-23 00:06:36 [INFO] bot.features.antispam.handlers (handlers.py:469) - Executing database query for username: altmemy19
+2025-08-23 00:06:36 [ERROR] bot.features.antispam.handlers (handlers.py:490) - Error checking user database for @altmemy19: (sqlite3.OperationalError) no such column: user_id
+[SQL: SELECT user_id FROM users WHERE LOWER(username) = LOWER(?)]
+[parameters: ('altmemy19',)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-08-23 00:06:36 [INFO] bot.features.antispam.handlers (handlers.py:494) - Adding @altmemy19 to filtered list for policy check
+2025-08-23 00:06:36 [INFO] bot.features.antispam.handlers (handlers.py:534) - Processing filtered usernames: ['@altmemy19']
+2025-08-23 00:06:36 [INFO] bot.features.antispam.handlers (handlers.py:538) - Username policy for @altmemy19: None
+2025-08-23 00:06:36 [INFO] bot.features.antispam.handlers (handlers.py:549) - Block all is enabled, action for @altmemy19: warn
+2025-08-23 00:06:36 [INFO] bot.features.antispam.handlers (handlers.py:556) - Taking action: warn for user 7656238434
+2025-08-23 00:07:24 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-23 00:07:24 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250822_220724.db
+2025-08-23 00:07:24 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250822_220724.db.gz (compressed 96.0%, 68.0 KB → 2.7 KB)
+2025-08-23 00:07:24 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-23 00:07:24 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-23 00:07:24 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-23 00:13:21 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-23 00:13:21 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-23 00:13:21 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-23 00:13:21 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-23 00:13:21 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-23 00:13:21 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-23 00:13:21 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-23 00:13:21 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-23 00:13:29 [INFO] bot.features.antispam.handlers (handlers.py:400) - Found usernames in message: ['@altmemy19']
+2025-08-23 00:13:29 [INFO] bot.features.antispam.handlers (handlers.py:451) - Checking username: @altmemy19
+2025-08-23 00:13:29 [INFO] bot.features.antispam.handlers (handlers.py:489) - Checking if altmemy19 is a group member (not in cache)
+2025-08-23 00:13:29 [INFO] bot.features.antispam.handlers (handlers.py:504) - Could not verify @altmemy19 membership (user not known to bot): Invalid user_id specified
+2025-08-23 00:13:29 [INFO] bot.features.antispam.handlers (handlers.py:508) - Adding @altmemy19 to filtered list for policy check
+2025-08-23 00:13:29 [INFO] bot.features.antispam.handlers (handlers.py:548) - Processing filtered usernames: ['@altmemy19']
+2025-08-23 00:13:29 [INFO] bot.features.antispam.handlers (handlers.py:552) - Username policy for @altmemy19: None
+2025-08-23 00:13:29 [INFO] bot.features.antispam.handlers (handlers.py:563) - Block all is enabled, action for @altmemy19: warn
+2025-08-23 00:13:29 [INFO] bot.features.antispam.handlers (handlers.py:570) - Taking action: warn for user 7656238434
+2025-08-23 00:14:21 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-23 00:14:21 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250822_221421.db
+2025-08-23 00:14:21 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250822_221421.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-23 00:14:21 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-23 00:14:21 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-23 00:14:21 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-23 00:30:45 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-23 00:30:45 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-23 00:30:45 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-23 00:30:45 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-23 00:30:45 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-23 00:30:45 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-23 00:30:45 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-23 00:30:45 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-23 00:31:30 [INFO] bot.features.antispam.handlers (handlers.py:498) - Cannot verify membership for plain mention @altmemy19 (no user_id available)
+2025-08-23 00:31:30 [INFO] bot.features.antispam.handlers (handlers.py:559) - No action needed, decided_action: None
+2025-08-23 00:31:42 [INFO] bot.features.antispam.handlers (handlers.py:498) - Cannot verify membership for plain mention @altmemy1 (no user_id available)
+2025-08-23 00:31:42 [INFO] bot.features.antispam.handlers (handlers.py:559) - No action needed, decided_action: None
+2025-08-23 00:31:45 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-23 00:31:45 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250822_223145.db
+2025-08-23 00:31:45 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250822_223145.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-23 00:31:45 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-23 00:31:45 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-23 00:31:45 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-23 01:00:20 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-23 01:00:20 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-23 01:00:20 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-23 01:00:20 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-23 01:00:20 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-23 01:00:20 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-23 01:00:20 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-23 01:00:20 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-23 01:00:52 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /panel exists but no handler registered
+2025-08-23 01:01:20 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-23 01:01:20 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250822_230120.db
+2025-08-23 01:01:20 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250822_230120.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-23 01:01:20 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-23 01:01:20 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-23 01:01:20 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-23 01:34:56 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-23 01:34:56 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-23 01:34:56 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-23 01:34:56 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-23 01:34:56 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-23 01:34:56 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-23 01:34:56 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-23 01:34:56 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-23 01:35:13 [INFO] bot.features.onboarding.handlers (handlers.py:105) - Processing join request for user 7656238434 in group -1001910797070 (Test 2)
+2025-08-23 01:35:13 [INFO] bot.features.onboarding.handlers (handlers.py:118) - Join settings for -1001910797070: auto_approve=True, require_accept=False
+2025-08-23 01:35:13 [INFO] bot.features.onboarding.handlers (handlers.py:188) - Auto-approve is enabled for -1001910797070, approving user 7656238434
+2025-08-23 01:35:14 [INFO] bot.features.onboarding.handlers (handlers.py:225) - Approved join request for user 7656238434 in group -1001910797070
+2025-08-23 01:35:24 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-23 01:35:37 [INFO] bot.features.onboarding.handlers (handlers.py:411) - Tracked user interaction via rules accept callback: user 7656238434 for group -1001910797070
+2025-08-23 01:35:56 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-23 01:35:56 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250822_233556.db
+2025-08-23 01:35:56 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250822_233556.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-23 01:35:56 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-23 01:35:56 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-23 01:35:56 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-23 01:36:12 [INFO] bot.features.onboarding.handlers (handlers.py:105) - Processing join request for user 2022201227 in group -1001910797070 (Test 2)
+2025-08-23 01:36:12 [INFO] bot.features.onboarding.handlers (handlers.py:118) - Join settings for -1001910797070: auto_approve=True, require_accept=False
+2025-08-23 01:36:12 [INFO] bot.features.onboarding.handlers (handlers.py:188) - Auto-approve is enabled for -1001910797070, approving user 2022201227
+2025-08-23 01:36:13 [INFO] bot.features.onboarding.handlers (handlers.py:225) - Approved join request for user 2022201227 in group -1001910797070
+2025-08-23 01:36:25 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-23 01:36:26 [INFO] bot.features.onboarding.handlers (handlers.py:411) - Tracked user interaction via rules accept callback: user 2022201227 for group -1001910797070

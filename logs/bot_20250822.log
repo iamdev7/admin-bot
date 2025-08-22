@@ -2131,3 +2131,296 @@ telegram.error.BadRequest: Message is not modified: specified new message conten
 2025-08-22 21:16:46 [INFO] bot.features.onboarding.handlers (handlers.py:231) - Approved join request for user 7656238434 in group -1001910797070
 2025-08-22 21:16:51 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
 2025-08-22 21:16:52 [INFO] bot.features.onboarding.handlers (handlers.py:417) - Tracked user interaction via rules accept callback: user 7656238434 for group -1001910797070
+2025-08-22 21:21:02 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 21:21:02 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 21:21:02 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-22 21:21:02 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-22 21:21:02 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-22 21:21:02 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-22 21:21:02 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-22 21:21:02 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-22 21:21:16 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /panel exists but no handler registered
+2025-08-22 21:21:42 [INFO] bot.features.admin_panel.handlers (handlers.py:500) - Disabled auto_approve for -1001910797070 due to require_accept being enabled
+2025-08-22 21:21:48 [INFO] bot.features.admin_panel.handlers (handlers.py:441) - Disabled require_accept for -1001910797070 due to auto_approve being enabled
+2025-08-22 21:22:02 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-22 21:22:02 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250822_192202.db
+2025-08-22 21:22:02 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250822_192202.db.gz (compressed 96.2%, 68.0 KB → 2.6 KB)
+2025-08-22 21:22:03 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-22 21:22:03 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-22 21:22:03 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-22 21:22:20 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-22 21:22:22 [INFO] bot.features.onboarding.handlers (handlers.py:417) - Tracked user interaction via rules accept callback: user 7656238434 for group -1001910797070
+2025-08-22 22:25:35 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 22:25:35 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 22:25:35 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-22 22:25:35 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-22 22:25:35 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-22 22:25:35 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-22 22:25:35 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-22 22:25:36 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-22 22:25:37 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /panel exists but no handler registered
+2025-08-22 22:25:53 [ERROR] bot.core.error_handler (error_handler.py:51) - Exception while handling an update:
+Traceback (most recent call last):
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_application.py", line 1311, in process_update
+    await coroutine
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_handlers/basehandler.py", line 158, in handle_update
+    return await self.callback(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/altmemy/projecrts/python project/admin-bot/bot/features/admin_panel/handlers.py", line 579, in on_callback
+    return await show_locks(update, context, gid)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/altmemy/projecrts/python project/admin-bot/bot/features/admin_panel/handlers.py", line 1311, in show_locks
+    await update.effective_message.edit_text(t(lang, "panel.locks.title"), reply_markup=InlineKeyboardMarkup(rows))
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_message.py", line 3904, in edit_text
+    return await self.get_bot().edit_message_text(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<15 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_extbot.py", line 1723, in edit_message_text
+    return await super().edit_message_text(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<15 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_bot.py", line 4294, in edit_message_text
+    return await self._send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<11 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_extbot.py", line 630, in _send_message
+    result = await super()._send_message(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<21 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_bot.py", line 810, in _send_message
+    result = await self._post(
+             ^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_bot.py", line 698, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_extbot.py", line 370, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_bot.py", line 727, in _do_post
+    result = await request.post(
+             ^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/request/_baserequest.py", line 197, in post
+    result = await self._request_wrapper(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/request/_baserequest.py", line 374, in _request_wrapper
+    raise exception
+telegram.error.BadRequest: Message is not modified: specified new message content and reply markup are exactly the same as a current content and reply markup of the message
+2025-08-22 22:26:17 [ERROR] bot.core.error_handler (error_handler.py:51) - Exception while handling an update:
+Traceback (most recent call last):
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_application.py", line 1311, in process_update
+    await coroutine
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_handlers/basehandler.py", line 158, in handle_update
+    return await self.callback(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/altmemy/projecrts/python project/admin-bot/bot/features/admin_panel/handlers.py", line 579, in on_callback
+    return await show_locks(update, context, gid)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/altmemy/projecrts/python project/admin-bot/bot/features/admin_panel/handlers.py", line 1311, in show_locks
+    await update.effective_message.edit_text(t(lang, "panel.locks.title"), reply_markup=InlineKeyboardMarkup(rows))
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_message.py", line 3904, in edit_text
+    return await self.get_bot().edit_message_text(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<15 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_extbot.py", line 1723, in edit_message_text
+    return await super().edit_message_text(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<15 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_bot.py", line 4294, in edit_message_text
+    return await self._send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<11 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_extbot.py", line 630, in _send_message
+    result = await super()._send_message(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<21 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_bot.py", line 810, in _send_message
+    result = await self._post(
+             ^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_bot.py", line 698, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/ext/_extbot.py", line 370, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/_bot.py", line 727, in _do_post
+    result = await request.post(
+             ^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/request/_baserequest.py", line 197, in post
+    result = await self._request_wrapper(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "/home/altmemy/.local/lib/python3.13/site-packages/telegram/request/_baserequest.py", line 374, in _request_wrapper
+    raise exception
+telegram.error.BadRequest: Message is not modified: specified new message content and reply markup are exactly the same as a current content and reply markup of the message
+2025-08-22 22:26:36 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-22 22:26:36 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250822_202636.db
+2025-08-22 22:26:36 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250822_202636.db.gz (compressed 96.1%, 68.0 KB → 2.6 KB)
+2025-08-22 22:26:36 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-22 22:26:36 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-22 22:26:36 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-22 22:28:33 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 22:28:33 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 22:28:33 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-22 22:28:33 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-22 22:28:33 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-22 22:28:33 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-22 22:28:33 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-22 22:28:34 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-22 22:28:45 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /panel exists but no handler registered
+2025-08-22 22:29:34 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-22 22:29:34 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250822_202934.db
+2025-08-22 22:29:34 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250822_202934.db.gz (compressed 96.1%, 68.0 KB → 2.6 KB)
+2025-08-22 22:29:34 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-22 22:29:34 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-22 22:29:34 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-22 22:38:39 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 22:38:39 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 22:38:39 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-22 22:38:39 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-22 22:38:39 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-22 22:38:39 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-22 22:38:39 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-22 22:38:39 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-22 22:38:48 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /panel exists but no handler registered
+2025-08-22 22:39:39 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-22 22:39:39 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250822_203939.db
+2025-08-22 22:39:39 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250822_203939.db.gz (compressed 96.0%, 68.0 KB → 2.7 KB)
+2025-08-22 22:39:39 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-22 22:39:39 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-22 22:39:39 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-22 22:51:49 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 22:51:49 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 22:51:49 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-22 22:51:49 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-22 22:51:49 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-22 22:51:49 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-22 22:51:49 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-22 22:51:49 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-22 22:51:58 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /panel exists but no handler registered
+2025-08-22 22:52:49 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-22 22:52:49 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250822_205249.db
+2025-08-22 22:52:49 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250822_205249.db.gz (compressed 96.0%, 68.0 KB → 2.7 KB)
+2025-08-22 22:52:49 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-22 22:52:49 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-22 22:52:49 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-22 23:01:29 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 23:01:29 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 23:01:29 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-22 23:01:29 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-22 23:01:29 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-22 23:01:29 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-22 23:01:29 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-22 23:01:29 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-22 23:01:34 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /panel exists but no handler registered
+2025-08-22 23:02:29 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-22 23:02:29 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250822_210229.db
+2025-08-22 23:02:29 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250822_210229.db.gz (compressed 96.0%, 68.0 KB → 2.7 KB)
+2025-08-22 23:02:30 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-22 23:02:30 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-22 23:02:30 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-22 23:16:14 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 23:16:14 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 23:16:14 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-22 23:16:14 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-22 23:16:14 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-22 23:16:14 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-22 23:16:14 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-22 23:16:14 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-22 23:16:27 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /panel exists but no handler registered
+2025-08-22 23:17:14 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-22 23:17:14 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250822_211714.db
+2025-08-22 23:17:14 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250822_211714.db.gz (compressed 96.0%, 68.0 KB → 2.7 KB)
+2025-08-22 23:17:14 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-22 23:17:14 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-22 23:17:14 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-22 23:44:02 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 23:44:02 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 23:44:02 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-22 23:44:02 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-22 23:44:02 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-22 23:44:02 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-22 23:44:02 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-22 23:44:02 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-22 23:44:17 [INFO] bot.features.antispam.handlers (handlers.py:393) - Found usernames in message: ['@altmemy19']
+2025-08-22 23:44:17 [INFO] bot.features.antispam.handlers (handlers.py:444) - Checking username: @altmemy19
+2025-08-22 23:44:17 [INFO] bot.features.antispam.handlers (handlers.py:455) - Checking member status for: @altmemy19
+2025-08-22 23:44:17 [WARNING] bot.features.antispam.handlers (handlers.py:465) - Could not verify member status for @altmemy19: Invalid user_id specified
+2025-08-22 23:44:17 [INFO] bot.features.antispam.handlers (handlers.py:468) - Adding @altmemy19 to filtered list for policy check
+2025-08-22 23:44:17 [INFO] bot.features.antispam.handlers (handlers.py:506) - Processing filtered usernames: ['@altmemy19']
+2025-08-22 23:44:17 [INFO] bot.features.antispam.handlers (handlers.py:510) - Username policy for @altmemy19: None
+2025-08-22 23:44:17 [INFO] bot.features.antispam.handlers (handlers.py:521) - Block all is enabled, action for @altmemy19: warn
+2025-08-22 23:44:17 [INFO] bot.features.antispam.handlers (handlers.py:528) - Taking action: warn for user 7656238434
+2025-08-22 23:45:02 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-22 23:45:02 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250822_214502.db
+2025-08-22 23:45:02 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250822_214502.db.gz (compressed 96.0%, 68.0 KB → 2.7 KB)
+2025-08-22 23:45:02 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-22 23:45:02 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-22 23:45:02 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-22 23:47:11 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 23:47:11 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-22 23:47:11 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-22 23:47:11 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-22 23:47:11 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-22 23:47:11 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-22 23:47:11 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-22 23:47:11 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-22 23:47:24 [INFO] bot.features.antispam.handlers (handlers.py:393) - Found usernames in message: ['@altmemy19']
+2025-08-22 23:47:24 [INFO] bot.features.antispam.handlers (handlers.py:444) - Checking username: @altmemy19
+2025-08-22 23:47:24 [INFO] bot.features.antispam.handlers (handlers.py:455) - Checking member status for: altmemy19
+2025-08-22 23:47:24 [WARNING] bot.features.antispam.handlers (handlers.py:466) - Could not verify member status for @altmemy19: Invalid user_id specified
+2025-08-22 23:47:24 [INFO] bot.features.antispam.handlers (handlers.py:469) - Adding @altmemy19 to filtered list for policy check
+2025-08-22 23:47:24 [INFO] bot.features.antispam.handlers (handlers.py:507) - Processing filtered usernames: ['@altmemy19']
+2025-08-22 23:47:24 [INFO] bot.features.antispam.handlers (handlers.py:511) - Username policy for @altmemy19: None
+2025-08-22 23:47:24 [INFO] bot.features.antispam.handlers (handlers.py:522) - Block all is enabled, action for @altmemy19: warn
+2025-08-22 23:47:24 [INFO] bot.features.antispam.handlers (handlers.py:529) - Taking action: warn for user 7656238434
+2025-08-22 23:48:11 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-22 23:48:11 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250822_214811.db
+2025-08-22 23:48:11 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250822_214811.db.gz (compressed 96.0%, 68.0 KB → 2.7 KB)
+2025-08-22 23:48:11 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-22 23:48:11 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-22 23:48:11 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed

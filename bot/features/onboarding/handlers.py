@@ -134,13 +134,10 @@ async def on_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             approve = False
         # Attempt DM
         lang_code = (req.from_user.language_code or "en").split("-")[0]
-        header = t(lang_code, "rules.dm.header")
-        text = header + "\n\n" + t(
-            lang_code,
-            "join.dm.text",
-            group_title=req.chat.title or "",
-            rules=rules_text or t(lang_code, "rules.default"),
-        )
+        header = t(lang_code, "rules.dm.header", 
+                  group_title=req.chat.title or "", 
+                  first_name=req.from_user.first_name or "")
+        text = header + "\n\n" + (rules_text or t(lang_code, "rules.default"))
         # Generate deep links for accept/decline to ensure bot conversation starts
         bot_username = (await context.bot.get_me()).username or ""
         # Encode the action with group and user IDs in base64 for cleaner URLs
@@ -195,13 +192,10 @@ async def on_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         lang_code = (req.from_user.language_code or "en").split("-")[0]
         # Try to DM rules (without button if CAPTCHA is enabled, since they need to solve CAPTCHA first)
         try:
-            header = t(lang_code, "rules.dm.header")
-            text = header + "\n\n" + t(
-                lang_code,
-                "join.dm.rules",
-                group_title=req.chat.title or "",
-                rules=rules_text or t(lang_code, "rules.default"),
-            )
+            header = t(lang_code, "rules.dm.header",
+                      group_title=req.chat.title or "",
+                      first_name=req.from_user.first_name or "")
+            text = header + "\n\n" + (rules_text or t(lang_code, "rules.default"))
             
             # Only add Accept button if CAPTCHA is NOT enabled
             # If CAPTCHA is enabled, user must solve it in the group first

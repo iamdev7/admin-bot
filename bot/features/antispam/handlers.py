@@ -367,6 +367,14 @@ def _extract_urls(text: str) -> list[str]:
     return url_re.findall(text)
 
 
+def _extract_usernames(text: str) -> list[str]:
+    """Extract @username mentions from text"""
+    import re
+    
+    username_re = re.compile(r"@[a-zA-Z][a-zA-Z0-9_]{4,31}", re.IGNORECASE)
+    return username_re.findall(text)
+
+
 async def enforce_link_policy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     if not update.effective_message or not update.effective_chat or not update.effective_user:
         return False
@@ -377,7 +385,12 @@ async def enforce_link_policy(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     text = _msg_text(update)
     urls = _extract_urls(text)
-    if not urls:
+    usernames = _extract_usernames(text)
+    
+    import logging
+    log = logging.getLogger(__name__)
+    
+    if not urls and not usernames:
         return False
 
     async with db.SessionLocal() as s:  # type: ignore
@@ -413,12 +426,48 @@ async def enforce_link_policy(update: Update, context: ContextTypes.DEFAULT_TYPE
             candidates.append(".".join(parts[-2:]))
         return any(d in candidates for d in doms)
 
-    # Decide action based on each URL
+    # Get group username for auto-allow
+    group_username = None
+    if update.effective_chat.username:
+        group_username = f"@{update.effective_chat.username}".lower()
+    
+    # For now, don't filter usernames - just process them normally
+    # The Telegram API doesn't reliably allow checking membership by username
+    filtered_usernames = []
+    
+    for username in usernames:
+        username_lower = username.lower()
+        
+        # Auto-allow group's own username
+        if group_username and username_lower == group_username:
+            continue
+        
+        # Auto-allow sender's own username
+        if update.effective_user and update.effective_user.username:
+            sender_username = f"@{update.effective_user.username}".lower()
+            if username_lower == sender_username:
+                continue
+        
+        # Add to filtered list for policy check
+        filtered_usernames.append(username)
+    
+    # Decide action based on each item (URL or username)
     decided_action: str | None = None
+    
+    # Process URLs
     for u in urls:
         host = (urlparse(u).hostname or "").lower()
         if not host:
             continue
+            
+        # Auto-allow group's own links (t.me/groupname or telegram.me/groupname)
+        if group_username and host in {"t.me", "telegram.me"}:
+            path = urlparse(u).path.lower()
+            group_name_without_at = group_username[1:]  # Remove @ from username
+            # Check if it's a link to the group or a message in the group
+            if path.startswith(f"/{group_name_without_at}/") or path == f"/{group_name_without_at}":
+                continue  # Skip this URL, it's the group's own link
+        
         # Allowlist overrides everything
         if in_list(host, allowlist):
             continue
@@ -434,6 +483,22 @@ async def enforce_link_policy(update: Update, context: ContextTypes.DEFAULT_TYPE
         if block_all or in_list(host, denylist):
             decided_action = default_action
             break
+    
+    # Process filtered usernames if no action decided yet
+    if not decided_action and filtered_usernames:
+        for username in filtered_usernames:
+            # Check username policy
+            username_action = type_actions.get("usernames")
+            if username_action and username_action != "allow":
+                decided_action = username_action
+                break
+            elif username_action == "allow":
+                continue
+            
+            # Apply default policy if block_all is enabled
+            if block_all:
+                decided_action = default_action
+                break
 
     if not decided_action or decided_action == "allow":
         return False
