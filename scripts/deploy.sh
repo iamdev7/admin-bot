@@ -19,7 +19,7 @@ REMOTE="${REMOTE:-ec2-user@13.62.57.59}"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/bot-key.pem}"
 REMOTE_DIR="${REMOTE_DIR:-/home/ec2-user/admin-bot}"
 EXCLUDES_FILE="${EXCLUDES_FILE:-.deployignore}"
-SERVICE="${SERVICE:-}"
+SERVICE="${SERVICE:-admin-bot}"
 NO_PUSH=false
 DRY_RUN=false
 BRANCH_OVERRIDE=""
@@ -34,7 +34,7 @@ Usage: $0 [options]
   --key PATH              SSH private key (default: $SSH_KEY)
   --remote-dir PATH       Target dir on remote (default: $REMOTE_DIR)
   --excludes-file PATH    rsync exclude file (default: $EXCLUDES_FILE)
-  --service NAME          systemd unit to restart after deploy (optional)
+  --service NAME          systemd unit to restart after deploy (default: admin-bot)
   -h, --help              Show this help
 USAGE
 }
