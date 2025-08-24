@@ -1,3 +1,19 @@
+"""
+Anti-spam and content filtering module.
+
+Filtering Order (optimized for efficiency):
+1. Admin/Linked Channel Check - Exempt trusted users first
+2. Global Blacklist - High priority banned words across all groups
+3. Link/Username Policy - URLs and username mentions filtering
+4. Content Rules - Custom word/regex filters per group
+5. Rate Limiting - Anti-spam flood protection
+
+Each filter properly:
+- Checks admin exemption
+- Handles private vs group chats
+- Caches results where possible
+- Logs actions for audit
+"""
 from __future__ import annotations
 
 import time
@@ -18,6 +34,50 @@ from ...infra.repos import AuditRepo, FiltersRepo
 from ...infra.settings_repo import SettingsRepo
 
 log = logging.getLogger(__name__)
+
+
+async def is_user_exempt_from_rules(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Check if a user is exempt from all filtering rules.
+    
+    Returns True if the user should be exempt:
+    - User is a group admin or creator
+    - Message is from the linked channel
+    """
+    if not update.effective_chat or not update.effective_user:
+        return False
+    
+    # Only apply exemptions in groups
+    if update.effective_chat.type == "private":
+        return False
+    
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    # Check if user is admin or creator
+    try:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        if member.status in ['administrator', 'creator']:
+            log.debug(f"User {user_id} is exempt from rules (admin/creator)")
+            return True
+    except Exception as e:
+        log.debug(f"Failed to check admin status for user {user_id}: {e}")
+    
+    # Check if message is from the linked channel
+    # When a channel posts to a linked group, the sender appears as the channel itself
+    if update.effective_message and hasattr(update.effective_message, 'sender_chat'):
+        sender_chat = update.effective_message.sender_chat
+        if sender_chat:
+            try:
+                # Get the group's linked channel
+                chat = await context.bot.get_chat(chat_id)
+                if hasattr(chat, 'linked_chat_id') and chat.linked_chat_id:
+                    if sender_chat.id == chat.linked_chat_id:
+                        log.debug(f"Message from linked channel {sender_chat.id} is exempt")
+                        return True
+            except Exception as e:
+                log.debug(f"Failed to check linked channel: {e}")
+    
+    return False
 
 
 DEFAULTS = {
@@ -43,8 +103,22 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_chat.type == "private":
         return
     
+    # Update member cache with any user who sends a message (they must be in the group)
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
+    if update.effective_user.username:
+        update_member_cache(context, chat_id, user_id, update.effective_user.username)
+        
+        # Also track recent activity
+        if 'recent_users' not in context.chat_data:
+            context.chat_data['recent_users'] = {}
+        username_lower = f"@{update.effective_user.username.lower()}"
+        context.chat_data['recent_users'][username_lower] = time.time()
+    
+    # Skip all rules for admins and linked channel
+    if await is_user_exempt_from_rules(update, context):
+        return
+    
     # Global blacklist, links policy, then content rules
     gb = await enforce_global_blacklist(update, context)
     if gb:
@@ -169,6 +243,10 @@ async def enforce_global_blacklist(update: Update, context: ContextTypes.DEFAULT
     if update.effective_chat.type == "private":
         return False
     
+    # Skip for admins and linked channel
+    if await is_user_exempt_from_rules(update, context):
+        return False
+    
     text = _msg_text(update)
     if not text:
         return False
@@ -261,6 +339,10 @@ async def enforce_content_rules(update: Update, context: ContextTypes.DEFAULT_TY
     
     # Only enforce in groups, not in private chats
     if update.effective_chat.type == "private":
+        return False
+    
+    # Skip for admins and linked channel
+    if await is_user_exempt_from_rules(update, context):
         return False
     
     gid = update.effective_chat.id
@@ -375,6 +457,109 @@ def _extract_usernames(text: str) -> list[str]:
     return username_re.findall(text)
 
 
+async def is_username_in_group(username: str, chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """
+    Professional function to verify if a username belongs to a group member.
+    
+    Args:
+        username: The username to check (with or without @)
+        chat_id: The group chat ID
+        context: The bot context
+    
+    Returns:
+        True if the user is confirmed to be in the group, False otherwise
+    """
+    # Normalize username
+    username_clean = username.lstrip('@').lower()
+    username_with_at = f"@{username_clean}"
+    
+    log.debug(f"Checking if {username_with_at} is in group {chat_id}")
+    
+    # Method 1: Check if it's a known admin
+    try:
+        admins = await context.bot.get_chat_administrators(chat_id)
+        for admin in admins:
+            if admin.user.username and admin.user.username.lower() == username_clean:
+                log.debug(f"{username_with_at} is an admin")
+                return True
+    except Exception as e:
+        log.debug(f"Failed to get admins: {e}")
+    
+    # Method 2: Try to get user info using get_chat (works for some public profiles)
+    try:
+        # This might work for users with public profiles or channels
+        chat_info = await context.bot.get_chat(username_with_at)
+        if chat_info and chat_info.id:
+            # We got a user/chat ID, now check if they're in the group
+            try:
+                member = await context.bot.get_chat_member(chat_id, chat_info.id)
+                if member and member.status not in ['left', 'kicked']:
+                    log.debug(f"{username_with_at} is a member (status: {member.status})")
+                    # Update cache with this information
+                    if 'group_members_cache' not in context.bot_data:
+                        context.bot_data['group_members_cache'] = {}
+                    if chat_id not in context.bot_data['group_members_cache']:
+                        context.bot_data['group_members_cache'][chat_id] = {}
+                    context.bot_data['group_members_cache'][chat_id][username_with_at] = {
+                        'user_id': chat_info.id,
+                        'last_seen': time.time(),
+                        'verified': True
+                    }
+                    return True
+                else:
+                    log.debug(f"{username_with_at} is not a member (status: {member.status if member else 'None'})")
+                    return False
+            except Exception as e:
+                log.debug(f"Failed to check membership for {username_with_at}: {e}")
+    except Exception as e:
+        # This is expected for private users
+        log.debug(f"Could not get_chat for {username_with_at}: {e}")
+    
+    # Method 3: Check our member cache
+    if 'group_members_cache' in context.bot_data:
+        if chat_id in context.bot_data['group_members_cache']:
+            cache = context.bot_data['group_members_cache'][chat_id]
+            if username_with_at in cache:
+                cache_entry = cache[username_with_at]
+                # Check if cache is recent (24 hours)
+                if time.time() - cache_entry['last_seen'] < 86400:
+                    log.debug(f"{username_with_at} found in cache (user_id={cache_entry.get('user_id')})")
+                    return True
+    
+    # Method 4: Check recent activity
+    if 'recent_users' in context.chat_data:
+        if username_with_at in context.chat_data['recent_users']:
+            last_seen = context.chat_data['recent_users'][username_with_at]
+            if time.time() - last_seen < 3600:  # Active in last hour
+                log.debug(f"{username_with_at} was recently active")
+                return True
+    
+    log.debug(f"{username_with_at} could not be verified as a group member")
+    return False
+
+
+def get_group_members_cache(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> dict:
+    """Get or create a cache of known group members for this chat."""
+    if 'group_members_cache' not in context.bot_data:
+        context.bot_data['group_members_cache'] = {}
+    if chat_id not in context.bot_data['group_members_cache']:
+        context.bot_data['group_members_cache'][chat_id] = {}
+    return context.bot_data['group_members_cache'][chat_id]
+
+
+def update_member_cache(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int, username: str | None):
+    """Update the cache with a known group member."""
+    cache = get_group_members_cache(context, chat_id)
+    if username:
+        username_lower = f"@{username.lower()}" if not username.startswith('@') else username.lower()
+        cache[username_lower] = {
+            'user_id': user_id,
+            'last_seen': time.time(),
+            'verified': True
+        }
+        log.debug(f"Updated member cache: {username_lower} -> user_id={user_id}")
+
+
 async def enforce_link_policy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     if not update.effective_message or not update.effective_chat or not update.effective_user:
         return False
@@ -382,6 +567,15 @@ async def enforce_link_policy(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Only enforce in groups, not in private chats
     if update.effective_chat.type == "private":
         return False
+    
+    # Skip for admins and linked channel
+    if await is_user_exempt_from_rules(update, context):
+        return False
+    
+    # Update cache with current user
+    chat_id = update.effective_chat.id
+    if update.effective_user.username:
+        update_member_cache(context, chat_id, update.effective_user.id, update.effective_user.username)
     
     text = _msg_text(update)
     urls = _extract_urls(text)
@@ -431,8 +625,23 @@ async def enforce_link_policy(update: Update, context: ContextTypes.DEFAULT_TYPE
     if update.effective_chat.username:
         group_username = f"@{update.effective_chat.username}".lower()
     
-    # For now, don't filter usernames - just process them normally
-    # The Telegram API doesn't reliably allow checking membership by username
+    # Update cache with any users we see in the message context
+    if update.effective_message and update.effective_message.reply_to_message:
+        replied_user = update.effective_message.reply_to_message.from_user
+        if replied_user and replied_user.username:
+            # Update cache with replied user (they must be in the group)
+            update_member_cache(context, chat_id, replied_user.id, replied_user.username)
+            log.debug(f"Cached replied-to user: @{replied_user.username}")
+    
+    # Update cache with text_mention entities
+    if update.effective_message and update.effective_message.entities:
+        for entity in update.effective_message.entities:
+            if entity.type == "text_mention" and entity.user and entity.user.username:
+                # Update cache with this user for future reference
+                update_member_cache(context, chat_id, entity.user.id, entity.user.username)
+                log.debug(f"Cached text_mention user: @{entity.user.username}")
+    
+    # Filter usernames, excluding those that are group members
     filtered_usernames = []
     
     for username in usernames:
@@ -448,7 +657,12 @@ async def enforce_link_policy(update: Update, context: ContextTypes.DEFAULT_TYPE
             if username_lower == sender_username:
                 continue
         
-        # Add to filtered list for policy check
+        # Use the professional verification function to check membership
+        is_member = await is_username_in_group(username, chat_id, context)
+        if is_member:
+            continue
+        
+        # If not verified as a member, add to filtered list
         filtered_usernames.append(username)
     
     # Decide action based on each item (URL or username)
@@ -568,6 +782,82 @@ def is_night(cfg: dict) -> bool:
         return h >= from_h or h < to_h
 
 
+async def is_forward_allowed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Check if a forwarded message should be allowed despite forward restrictions.
+    
+    Returns True if the forward should be allowed (exempt from restrictions):
+    - Message is from the same group
+    - Message is from the linked channel
+    - Original sender is an admin
+    """
+    if not update.effective_message or not update.effective_chat:
+        return False
+    
+    msg = update.effective_message
+    chat_id = update.effective_chat.id
+    
+    # Check forward_origin (v22 API)
+    if hasattr(msg, 'forward_origin') and msg.forward_origin:
+        origin = msg.forward_origin
+        
+        # Check if from same group
+        if origin.type == 'chat' and hasattr(origin, 'sender_chat'):
+            if origin.sender_chat.id == chat_id:
+                return True
+        elif origin.type == 'channel' and hasattr(origin, 'chat'):
+            if origin.chat.id == chat_id:
+                return True
+        
+        # Check if from linked channel
+        try:
+            # Get full chat info to check linked_chat_id
+            chat = await context.bot.get_chat(chat_id)
+            if hasattr(chat, 'linked_chat_id') and chat.linked_chat_id:
+                if origin.type == 'channel' and hasattr(origin, 'chat'):
+                    if origin.chat.id == chat.linked_chat_id:
+                        return True
+                elif origin.type == 'chat' and hasattr(origin, 'sender_chat'):
+                    if origin.sender_chat.id == chat.linked_chat_id:
+                        return True
+        except Exception as e:
+            log.debug(f"Failed to check linked chat: {e}")
+        
+        # Check if original sender is an admin
+        if origin.type == 'user' and hasattr(origin, 'sender_user'):
+            try:
+                member = await context.bot.get_chat_member(chat_id, origin.sender_user.id)
+                if member.status in ['administrator', 'creator']:
+                    return True
+            except Exception as e:
+                log.debug(f"Failed to check admin status: {e}")
+    
+    # Fallback for older API attributes (backward compatibility)
+    if hasattr(msg, 'forward_from_chat') and msg.forward_from_chat:
+        # Check if from same group
+        if msg.forward_from_chat.id == chat_id:
+            return True
+        
+        # Check if from linked channel
+        try:
+            chat = await context.bot.get_chat(chat_id)
+            if hasattr(chat, 'linked_chat_id') and chat.linked_chat_id:
+                if msg.forward_from_chat.id == chat.linked_chat_id:
+                    return True
+        except Exception as e:
+            log.debug(f"Failed to check linked chat (legacy): {e}")
+    
+    # Check if forwarder is admin (for messages forwarded from private users)
+    if hasattr(msg, 'forward_from') and msg.forward_from:
+        try:
+            member = await context.bot.get_chat_member(chat_id, msg.forward_from.id)
+            if member.status in ['administrator', 'creator']:
+                return True
+        except Exception as e:
+            log.debug(f"Failed to check admin status (legacy): {e}")
+    
+    return False
+
+
 async def on_any(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Forward/media locks and caption/text enforcement for any message
     if not update.effective_chat or not update.effective_user or not update.effective_message:
@@ -575,6 +865,14 @@ async def on_any(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     # Only enforce locks in groups, not in private chats
     if update.effective_chat.type == "private":
+        return
+    
+    # Update member cache with any user who sends a message
+    if update.effective_user.username:
+        update_member_cache(context, update.effective_chat.id, update.effective_user.id, update.effective_user.username)
+    
+    # Skip all rules for admins and linked channel
+    if await is_user_exempt_from_rules(update, context):
         return
     
     gid = update.effective_chat.id
@@ -591,8 +889,10 @@ async def on_any(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if getattr(msg, "forward_date", None) or getattr(msg, "forward_origin", None):
         action = await get_lock_action(gid, "forwards")
         if action and action != "allow":
-            await apply_lock_action(action, gid, update.effective_user.id, update, context)
-            return
+            # Check if this forward should be allowed despite restrictions
+            if not await is_forward_allowed(update, context):
+                await apply_lock_action(action, gid, update.effective_user.id, update, context)
+                return
     # Media types
     mtype = detect_media_type(msg)
     if mtype:

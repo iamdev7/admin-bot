@@ -1,0 +1,327 @@
+2025-08-24 01:13:31 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 01:13:31 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 01:13:31 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-24 01:13:31 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-24 01:13:31 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-24 01:13:31 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-24 01:13:31 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-24 01:13:31 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-24 01:13:47 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /panel exists but no handler registered
+2025-08-24 01:14:31 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-24 01:14:31 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250823_231431.db
+2025-08-24 01:14:31 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250823_231431.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-24 01:14:32 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-24 01:14:32 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-24 01:14:32 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-24 01:27:36 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 01:27:36 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 01:27:36 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-24 01:27:36 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-24 01:27:36 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-24 01:27:36 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-24 01:27:36 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-24 01:27:36 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-24 01:28:36 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-24 01:28:36 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250823_232836.db
+2025-08-24 01:28:36 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250823_232836.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-24 01:28:36 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-24 01:28:36 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-24 01:28:36 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-24 01:33:33 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 01:33:33 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 01:33:33 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-24 01:33:33 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-24 01:33:33 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-24 01:33:33 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-24 01:33:33 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-24 01:33:33 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-24 01:34:06 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /panel exists but no handler registered
+2025-08-24 01:34:33 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-24 01:34:33 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250823_233433.db
+2025-08-24 01:34:33 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250823_233433.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-24 01:34:33 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-24 01:34:33 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-24 01:34:33 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-24 01:39:53 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 01:39:53 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 01:39:53 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-24 01:39:53 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-24 01:39:53 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-24 01:39:53 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-24 01:39:53 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-24 01:39:54 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-24 01:40:54 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-24 01:40:54 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250823_234054.db
+2025-08-24 01:40:54 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250823_234054.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-24 01:40:54 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-24 01:40:54 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-24 01:40:54 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-24 01:44:13 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 01:44:13 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 01:44:14 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-24 01:44:14 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-24 01:44:14 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-24 01:44:14 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-24 01:44:14 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-24 01:44:14 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-24 01:45:14 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-24 01:45:14 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250823_234514.db
+2025-08-24 01:45:14 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250823_234514.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-24 01:45:14 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-24 01:45:14 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-24 01:45:14 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-24 01:48:36 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 01:48:36 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 01:48:36 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-24 01:48:36 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-24 01:48:36 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-24 01:48:36 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-24 01:48:36 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-24 01:48:36 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-24 01:49:36 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-24 01:49:36 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250823_234936.db
+2025-08-24 01:49:36 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250823_234936.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-24 01:49:36 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-24 01:49:36 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-24 01:49:36 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-24 02:05:39 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 02:05:39 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 02:05:39 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-24 02:05:39 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-24 02:05:39 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-24 02:05:39 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-24 02:05:39 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-24 02:05:39 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-24 02:06:39 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-24 02:06:39 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250824_000639.db
+2025-08-24 02:06:39 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250824_000639.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-24 02:06:39 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-24 02:06:39 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-24 02:06:39 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-24 02:22:00 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 02:22:00 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 02:22:00 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-24 02:22:00 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-24 02:22:00 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-24 02:22:00 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-24 02:22:00 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-24 02:22:00 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-24 02:22:08 [INFO] bot.features.onboarding.handlers (handlers.py:105) - Processing join request for user 7656238434 in group -1001910797070 (Test 2)
+2025-08-24 02:22:08 [INFO] bot.features.onboarding.handlers (handlers.py:118) - Join settings for -1001910797070: auto_approve=True, require_accept=False
+2025-08-24 02:22:08 [INFO] bot.features.onboarding.handlers (handlers.py:188) - Auto-approve is enabled for -1001910797070, approving user 7656238434
+2025-08-24 02:22:08 [INFO] bot.features.onboarding.handlers (handlers.py:225) - Approved join request for user 7656238434 in group -1001910797070
+2025-08-24 02:23:00 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-24 02:23:00 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250824_002300.db
+2025-08-24 02:23:00 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250824_002300.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-24 02:23:00 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-24 02:23:00 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-24 02:23:00 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-24 02:30:35 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 02:30:35 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 02:30:35 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-24 02:30:35 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-24 02:30:35 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-24 02:30:35 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-24 02:30:35 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-24 02:30:36 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-24 02:30:45 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-24 02:30:46 [INFO] bot.features.onboarding.handlers (handlers.py:411) - Tracked user interaction via rules accept callback: user 7656238434 for group -1001910797070
+2025-08-24 02:31:00 [INFO] bot.features.onboarding.handlers (handlers.py:105) - Processing join request for user 7656238434 in group -1001910797070 (Test 2)
+2025-08-24 02:31:00 [INFO] bot.features.onboarding.handlers (handlers.py:118) - Join settings for -1001910797070: auto_approve=True, require_accept=False
+2025-08-24 02:31:00 [INFO] bot.features.onboarding.handlers (handlers.py:188) - Auto-approve is enabled for -1001910797070, approving user 7656238434
+2025-08-24 02:31:00 [INFO] bot.features.onboarding.handlers (handlers.py:225) - Approved join request for user 7656238434 in group -1001910797070
+2025-08-24 02:31:08 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-24 02:31:12 [INFO] bot.features.onboarding.handlers (handlers.py:411) - Tracked user interaction via rules accept callback: user 7656238434 for group -1001910797070
+2025-08-24 02:31:36 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-24 02:31:36 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250824_003136.db
+2025-08-24 02:31:36 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250824_003136.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-24 02:31:36 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-24 02:31:36 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-24 02:31:36 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-24 02:35:45 [ERROR] bot.core.error_handler (error_handler.py:51) - Exception while handling an update:
+Traceback (most recent call last):
+  File "/home/altmemy/projecrts/python project/admin-bot/.venv/lib64/python3.13/site-packages/telegram/ext/_jobqueue.py", line 997, in _run
+    await self.callback(context)
+  File "/home/altmemy/projecrts/python project/admin-bot/bot/main.py", line 453, in clear_flag
+    ctx.user_data.pop(recent_messages_key, None)
+    ^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'pop'
+2025-08-24 02:36:28 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 02:36:28 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 02:36:28 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-24 02:36:28 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-24 02:36:28 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-24 02:36:28 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-24 02:36:28 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-24 02:36:28 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-24 02:36:51 [INFO] bot.features.onboarding.handlers (handlers.py:105) - Processing join request for user 7656238434 in group -1001910797070 (Test 2)
+2025-08-24 02:36:51 [INFO] bot.features.onboarding.handlers (handlers.py:118) - Join settings for -1001910797070: auto_approve=True, require_accept=False
+2025-08-24 02:36:51 [INFO] bot.features.onboarding.handlers (handlers.py:188) - Auto-approve is enabled for -1001910797070, approving user 7656238434
+2025-08-24 02:36:52 [INFO] bot.features.onboarding.handlers (handlers.py:225) - Approved join request for user 7656238434 in group -1001910797070
+2025-08-24 02:37:28 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-24 02:37:28 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250824_003728.db
+2025-08-24 02:37:28 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250824_003728.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-24 02:37:28 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-24 02:37:28 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-24 02:37:28 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-24 02:38:13 [INFO] bot.features.onboarding.handlers (handlers.py:105) - Processing join request for user 2022201227 in group -1001910797070 (Test 2)
+2025-08-24 02:38:13 [INFO] bot.features.onboarding.handlers (handlers.py:118) - Join settings for -1001910797070: auto_approve=True, require_accept=False
+2025-08-24 02:38:13 [INFO] bot.features.onboarding.handlers (handlers.py:188) - Auto-approve is enabled for -1001910797070, approving user 2022201227
+2025-08-24 02:38:13 [INFO] bot.features.onboarding.handlers (handlers.py:225) - Approved join request for user 2022201227 in group -1001910797070
+2025-08-24 02:38:21 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-24 02:38:45 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-24 02:38:46 [INFO] bot.features.onboarding.handlers (handlers.py:411) - Tracked user interaction via rules accept callback: user 2022201227 for group -1001910797070
+2025-08-24 02:43:21 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 02:43:22 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 02:43:22 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-24 02:43:22 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-24 02:43:22 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-24 02:43:22 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-24 02:43:22 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-24 02:43:22 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-24 02:43:29 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-24 02:43:30 [INFO] bot.features.onboarding.handlers (handlers.py:426) - Tracked user interaction via rules accept callback: user 7656238434 for group -1001910797070
+2025-08-24 02:43:41 [INFO] bot.features.onboarding.handlers (handlers.py:105) - Processing join request for user 7656238434 in group -1001910797070 (Test 2)
+2025-08-24 02:43:41 [INFO] bot.features.onboarding.handlers (handlers.py:118) - Join settings for -1001910797070: auto_approve=True, require_accept=False
+2025-08-24 02:43:41 [INFO] bot.features.onboarding.handlers (handlers.py:188) - Auto-approve is enabled for -1001910797070, approving user 7656238434
+2025-08-24 02:43:41 [INFO] bot.features.onboarding.handlers (handlers.py:225) - Approved join request for user 7656238434 in group -1001910797070
+2025-08-24 02:44:06 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-24 02:44:08 [INFO] bot.features.onboarding.handlers (handlers.py:426) - Tracked user interaction via rules accept callback: user 7656238434 for group -1001910797070
+2025-08-24 02:44:22 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-24 02:44:22 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250824_004422.db
+2025-08-24 02:44:22 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250824_004422.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-24 02:44:22 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-24 02:44:22 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-24 02:44:22 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-24 02:44:27 [INFO] bot.features.onboarding.handlers (handlers.py:105) - Processing join request for user 2022201227 in group -1001910797070 (Test 2)
+2025-08-24 02:44:27 [INFO] bot.features.onboarding.handlers (handlers.py:118) - Join settings for -1001910797070: auto_approve=True, require_accept=False
+2025-08-24 02:44:27 [INFO] bot.features.onboarding.handlers (handlers.py:188) - Auto-approve is enabled for -1001910797070, approving user 2022201227
+2025-08-24 02:44:27 [INFO] bot.features.onboarding.handlers (handlers.py:225) - Approved join request for user 2022201227 in group -1001910797070
+2025-08-24 02:44:48 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-24 02:44:49 [INFO] bot.features.onboarding.handlers (handlers.py:426) - Tracked user interaction via rules accept callback: user 2022201227 for group -1001910797070
+2025-08-24 02:48:29 [ERROR] bot.core.error_handler (error_handler.py:51) - Exception while handling an update:
+Traceback (most recent call last):
+  File "/home/altmemy/projecrts/python project/admin-bot/.venv/lib64/python3.13/site-packages/telegram/ext/_jobqueue.py", line 997, in _run
+    await self.callback(context)
+  File "/home/altmemy/projecrts/python project/admin-bot/bot/main.py", line 453, in clear_flag
+    # Clear flag after some time
+AttributeError: 'NoneType' object has no attribute 'pop'
+2025-08-24 02:56:19 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /panel exists but no handler registered
+2025-08-24 03:05:03 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 03:05:03 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 03:05:03 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-24 03:05:03 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-24 03:05:03 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-24 03:05:03 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-24 03:05:03 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-24 03:05:03 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-24 03:05:09 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /panel exists but no handler registered
+2025-08-24 03:06:03 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-24 03:06:03 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250824_010603.db
+2025-08-24 03:06:03 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250824_010603.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-24 03:06:03 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-24 03:06:03 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-24 03:06:03 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-24 03:06:07 [INFO] bot.features.onboarding.handlers (handlers.py:105) - Processing join request for user 7656238434 in group -1001910797070 (Test 2)
+2025-08-24 03:06:07 [INFO] bot.features.onboarding.handlers (handlers.py:118) - Join settings for -1001910797070: auto_approve=True, require_accept=False
+2025-08-24 03:06:07 [INFO] bot.features.onboarding.handlers (handlers.py:188) - Auto-approve is enabled for -1001910797070, approving user 7656238434
+2025-08-24 03:06:07 [INFO] bot.features.onboarding.handlers (handlers.py:225) - Approved join request for user 7656238434 in group -1001910797070
+2025-08-24 03:06:49 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-24 03:06:52 [INFO] bot.features.onboarding.handlers (handlers.py:426) - Tracked user interaction via rules accept callback: user 7656238434 for group -1001910797070
+2025-08-24 03:07:03 [INFO] bot.features.onboarding.handlers (handlers.py:105) - Processing join request for user 7656238434 in group -1001910797070 (Test 2)
+2025-08-24 03:07:03 [INFO] bot.features.onboarding.handlers (handlers.py:118) - Join settings for -1001910797070: auto_approve=True, require_accept=False
+2025-08-24 03:07:03 [INFO] bot.features.onboarding.handlers (handlers.py:188) - Auto-approve is enabled for -1001910797070, approving user 7656238434
+2025-08-24 03:07:03 [INFO] bot.features.onboarding.handlers (handlers.py:225) - Approved join request for user 7656238434 in group -1001910797070
+2025-08-24 03:07:18 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-24 03:07:28 [INFO] bot.features.onboarding.handlers (handlers.py:426) - Tracked user interaction via rules accept callback: user 7656238434 for group -1001910797070
+2025-08-24 03:13:25 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 03:13:25 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 03:13:25 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-24 03:13:25 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-24 03:13:25 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-24 03:13:25 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-24 03:13:25 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-24 03:13:25 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-24 03:13:36 [INFO] bot.features.onboarding.handlers (handlers.py:105) - Processing join request for user 7656238434 in group -1001910797070 (Test 2)
+2025-08-24 03:13:36 [INFO] bot.features.onboarding.handlers (handlers.py:118) - Join settings for -1001910797070: auto_approve=True, require_accept=False
+2025-08-24 03:13:36 [INFO] bot.features.onboarding.handlers (handlers.py:188) - Auto-approve is enabled for -1001910797070, approving user 7656238434
+2025-08-24 03:13:36 [INFO] bot.features.onboarding.handlers (handlers.py:225) - Approved join request for user 7656238434 in group -1001910797070
+2025-08-24 03:13:46 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-24 03:13:48 [INFO] bot.features.onboarding.handlers (handlers.py:457) - Tracked user interaction via rules accept callback: user 7656238434 for group -1001910797070
+2025-08-24 03:14:25 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-24 03:14:25 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250824_011425.db
+2025-08-24 03:14:25 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250824_011425.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-24 03:14:25 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-24 03:14:25 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-24 03:14:25 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-24 03:19:15 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 03:19:15 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 03:19:15 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-24 03:19:15 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-24 03:19:15 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-24 03:19:15 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-24 03:19:15 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-24 03:19:15 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-24 03:19:20 [INFO] bot.features.onboarding.handlers (handlers.py:105) - Processing join request for user 2022201227 in group -1001910797070 (Test 2)
+2025-08-24 03:19:20 [INFO] bot.features.onboarding.handlers (handlers.py:118) - Join settings for -1001910797070: auto_approve=True, require_accept=False
+2025-08-24 03:19:20 [INFO] bot.features.onboarding.handlers (handlers.py:188) - Auto-approve is enabled for -1001910797070, approving user 2022201227
+2025-08-24 03:19:20 [INFO] bot.features.onboarding.handlers (handlers.py:225) - Approved join request for user 2022201227 in group -1001910797070
+2025-08-24 03:19:28 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-24 03:20:15 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-24 03:20:15 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250824_012015.db
+2025-08-24 03:20:15 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250824_012015.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-24 03:20:15 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-24 03:20:15 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-24 03:20:15 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-24 03:20:27 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-24 03:20:28 [INFO] bot.features.onboarding.handlers (handlers.py:456) - Tracked user interaction via rules accept callback: user 2022201227 for group -1001910797070
+2025-08-24 03:24:12 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 03:24:12 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 03:24:12 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-24 03:24:12 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-24 03:24:12 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-24 03:24:12 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-24 03:24:12 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-24 03:24:12 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-24 03:24:19 [INFO] bot.features.onboarding.handlers (handlers.py:105) - Processing join request for user 2022201227 in group -1001910797070 (Test 2)
+2025-08-24 03:24:19 [INFO] bot.features.onboarding.handlers (handlers.py:118) - Join settings for -1001910797070: auto_approve=True, require_accept=False
+2025-08-24 03:24:19 [INFO] bot.features.onboarding.handlers (handlers.py:188) - Auto-approve is enabled for -1001910797070, approving user 2022201227
+2025-08-24 03:24:20 [INFO] bot.features.onboarding.handlers (handlers.py:225) - Approved join request for user 2022201227 in group -1001910797070
+2025-08-24 03:24:32 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-24 03:24:35 [INFO] bot.features.onboarding.handlers (handlers.py:458) - Tracked user interaction via rules accept callback: user 2022201227 for group -1001910797070
+2025-08-24 03:24:50 [INFO] bot.features.onboarding.handlers (handlers.py:105) - Processing join request for user 7656238434 in group -1001910797070 (Test 2)
+2025-08-24 03:24:50 [INFO] bot.features.onboarding.handlers (handlers.py:118) - Join settings for -1001910797070: auto_approve=True, require_accept=False
+2025-08-24 03:24:50 [INFO] bot.features.onboarding.handlers (handlers.py:188) - Auto-approve is enabled for -1001910797070, approving user 7656238434
+2025-08-24 03:24:51 [INFO] bot.features.onboarding.handlers (handlers.py:225) - Approved join request for user 7656238434 in group -1001910797070
+2025-08-24 03:25:00 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-24 03:25:01 [INFO] bot.features.onboarding.handlers (handlers.py:458) - Tracked user interaction via rules accept callback: user 7656238434 for group -1001910797070
+2025-08-24 03:25:10 [WARNING] bot.core.command_handler (command_handler.py:136) - Command /start exists but no handler registered
+2025-08-24 03:25:12 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-24 03:25:12 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250824_012512.db
+2025-08-24 03:25:12 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250824_012512.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-24 03:25:12 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-24 03:25:12 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-24 03:25:12 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-24 03:38:49 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 03:38:49 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 03:38:49 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-24 03:38:49 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-24 03:38:49 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-24 03:38:49 [INFO] bot.core.command_handler (command_handler.py:169) - Command handlers registered
+2025-08-24 03:38:49 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-24 03:38:49 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-24 03:39:49 [INFO] bot.core.backup (backup.py:147) - Starting scheduled backup
+2025-08-24 03:39:49 [INFO] bot.core.backup (backup.py:46) - Creating backup: bot_backup_20250824_013949.db
+2025-08-24 03:39:49 [INFO] bot.core.backup (backup.py:63) - Backup created: bot_backup_20250824_013949.db.gz (compressed 95.7%, 68.0 KB → 2.9 KB)
+2025-08-24 03:39:49 [INFO] bot.core.backup (backup.py:121) - Backup sent to admin 154732616
+2025-08-24 03:39:49 [INFO] bot.core.backup (backup.py:128) - Backup sent to 1 admin(s)
+2025-08-24 03:39:49 [INFO] bot.core.backup (backup.py:172) - Backup cycle completed
+2025-08-24 03:45:37 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 03:45:37 [INFO] bot.core.logging_config (logging_config.py:115) - Logging configured (console=INFO, file=ENABLED)
+2025-08-24 03:45:37 [INFO] bot.core.user_tracker (user_tracker.py:178) - User tracking middleware registered for all update types
+2025-08-24 03:45:37 [INFO] bot.features.global_enforcement (global_enforcement.py:278) - Global enforcement handlers registered
+2025-08-24 03:45:37 [INFO] bot.core.private_handler (private_handler.py:211) - Private message handler registered
+2025-08-24 03:45:37 [INFO] bot.core.command_handler (command_handler.py:170) - Command handlers registered
+2025-08-24 03:45:37 [INFO] bot.core.error_handler (error_handler.py:229) - Error handlers configured
+2025-08-24 03:45:37 [INFO] bot.core.backup (backup.py:231) - Backup schedule configured (every 24 hours, first in 1 minute)
+2025-08-24 03:45:45 [WARNING] bot.core.command_handler (command_handler.py:137) - Command /privacy exists but no handler registered

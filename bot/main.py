@@ -54,14 +54,20 @@ async def on_startup(app: Application) -> None:
 
 
 async def set_bot_commands(app: Application) -> None:
-    cmds: List[BotCommand] = [
-        BotCommand("start", "Start or open control panel"),
-        BotCommand("help", "Show help"),
-        BotCommand("rules", "Show group rules"),
-        BotCommand("settings", "Open settings (admins)"),
-        BotCommand("backup", "Create database backup (bot owner only)"),
-    ]
-    await app.bot.set_my_commands(cmds)
+    # Disable command suggestions for privacy
+    # Commands still work, but won't auto-complete when users type /
+    # This prevents exposing admin-only commands to regular users
+    await app.bot.delete_my_commands()
+    
+    # Original command list kept for reference:
+    # cmds: List[BotCommand] = [
+    #     BotCommand("start", "Start or open control panel"),
+    #     BotCommand("help", "Show help"),
+    #     BotCommand("rules", "Show group rules"),
+    #     BotCommand("settings", "Open settings (admins)"),
+    #     BotCommand("backup", "Create database backup (bot owner only)"),
+    # ]
+    # await app.bot.set_my_commands(cmds)
 
 
 def make_app() -> Application:
@@ -86,6 +92,10 @@ def make_app() -> Application:
     # Basic commands
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", new_help_command))
+    
+    # Privacy command
+    from .features.privacy import privacy
+    app.add_handler(CommandHandler("privacy", privacy))
     
     # Admin backup command
     app.add_handler(CommandHandler("backup", manual_backup_command))
@@ -210,14 +220,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                                 chat_id=update.effective_chat.id,
                                                 message_id=original_msg_id,
                                                 text=txt,
-                                                reply_markup=return_kb
+                                                reply_markup=return_kb,
+                                                parse_mode="HTML"
                                             )
                                         except Exception as e:
                                             log.warning(f"Could not edit original message: {e}")
                                             # Fallback: send a brief success message that auto-deletes
                                             success_msg = await context.bot.send_message(
                                                 chat_id=update.effective_chat.id,
-                                                text="✅ " + t(lang, 'rules.accepted')
+                                                text="✅ " + t(lang, 'rules.accepted'),
+                                                parse_mode="HTML"
                                             )
                                             async def delete_success(ctx):
                                                 try:
@@ -285,7 +297,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                             # Fallback: send decline message that auto-deletes
                                             decline_msg = await context.bot.send_message(
                                                 chat_id=update.effective_chat.id,
-                                                text="❌ " + t(lang, "join.declined_message")
+                                                text="❌ " + t(lang, "join.declined_message"),
+                                                parse_mode="HTML"
                                             )
                                             async def delete_decline(ctx):
                                                 try:
@@ -400,13 +413,51 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     group_title = chat.title
             except Exception as e:
                 log.exception("get_chat failed for gid=%s: %s", gid, e)
-            header = t(lang, "rules.dm.header")
-            txt = header + "\n\n" + t(lang, "join.dm.rules", group_title=group_title, rules=rules_text or t(lang, "rules.default"))
+            # Create professional rules message with group link and user mention
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-
+            
             uid = update.effective_user.id if update.effective_user else 0
-            kb = InlineKeyboardMarkup([[InlineKeyboardButton(t(lang, "join.accept"), callback_data=f"rules:accept:{gid}:{uid}")]])
-            await update.effective_message.reply_text(txt, reply_markup=kb)
+            user_name = update.effective_user.first_name if update.effective_user else "Member"
+            user_mention = f'<a href="tg://user?id={uid}">{user_name}</a>'
+            
+            # Create group link - only for public groups with username
+            group_link = f"<b>{group_title}</b>"  # Default: bold group name for private groups
+            try:
+                chat = await context.bot.get_chat(gid)
+                if chat and chat.username:
+                    # Public group - create clickable link
+                    group_link = f'<a href="https://t.me/{chat.username}">{group_title}</a>'
+                # For private groups, just use bold text (no invite link in rules message)
+            except Exception:
+                pass  # Fallback to bold group name
+            
+            # Use localized professional template
+            if not rules_text:
+                # No custom rules - use professional default
+                rules_text = (
+                    "📌 <b>General Guidelines:</b>\n\n"
+                    "1️⃣ <b>Be Respectful</b>\n"
+                    "   Treat all members with courtesy and respect.\n\n"
+                    "2️⃣ <b>No Spam</b>\n"
+                    "   Avoid repetitive messages, advertisements, or off-topic content.\n\n"
+                    "3️⃣ <b>Stay On Topic</b>\n"
+                    "   Keep discussions relevant to the group's purpose.\n\n"
+                    "4️⃣ <b>No Harassment</b>\n"
+                    "   Bullying, threats, or personal attacks are strictly prohibited.\n\n"
+                    "5️⃣ <b>Follow Telegram ToS</b>\n"
+                    "   Respect Telegram's Terms of Service at all times.\n\n"
+                    f"{'─' * 30}\n"
+                    "✅ By clicking 'Accept', you agree to follow these rules."
+                )
+            
+            # Use localized professional header template
+            txt = t(lang, "rules.dm.header_professional", 
+                   group_link=group_link,
+                   user_mention=user_mention,
+                   rules_text=rules_text)
+            
+            kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Accept Rules", callback_data=f"rules:accept:{gid}:{uid}")]])
+            await update.effective_message.reply_text(txt, reply_markup=kb, parse_mode="HTML")
             
             # Mark that we sent rules to avoid duplication
             context.user_data[recent_messages_key] = True

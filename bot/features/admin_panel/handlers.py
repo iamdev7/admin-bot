@@ -848,8 +848,17 @@ async def on_rules_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             continue
         k, gid = key
         if k == "await_rules" and payload:
+            # Get HTML formatted text to preserve formatting
+            html_text = ""
+            if update.effective_message.text:
+                # Use text_html to preserve all formatting (bold, italic, links, etc.)
+                html_text = update.effective_message.text_html
+            elif update.effective_message.caption:
+                # If admin sent a media with caption
+                html_text = update.effective_message.caption_html
+            
             async with db.SessionLocal() as s:  # type: ignore
-                await SettingsRepo(s).set_text(gid, "rules", update.effective_message.text or "")
+                await SettingsRepo(s).set_text(gid, "rules", html_text)
                 await s.commit()
             context.user_data[(k, gid)] = False
             lang = I18N.pick_lang(update)
@@ -897,9 +906,18 @@ async def on_rules_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 context.user_data.pop(("auto2_params", gid), None)
                 return
         if k == "await_welcome" and payload:
+            # Get HTML formatted text to preserve formatting
+            html_text = ""
+            if update.effective_message.text:
+                # Use text_html to preserve all formatting (bold, italic, links, etc.)
+                html_text = update.effective_message.text_html
+            elif update.effective_message.caption:
+                # If admin sent a media with caption
+                html_text = update.effective_message.caption_html
+            
             async with db.SessionLocal() as s:  # type: ignore
                 cfg = await SettingsRepo(s).get(gid, "welcome") or {}
-                cfg["template"] = update.effective_message.text or ""
+                cfg["template"] = html_text
                 await SettingsRepo(s).set(gid, "welcome", cfg)
                 await s.commit()
             context.user_data[(k, gid)] = False

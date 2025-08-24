@@ -18,6 +18,7 @@ COMMANDS = {
     # Public commands (anyone can use)
     "/start": {"private": True, "group": True, "owner": False, "admin": False},
     "/help": {"private": True, "group": True, "owner": False, "admin": False},
+    "/privacy": {"private": True, "group": True, "owner": False, "admin": False},
     "/rules": {"private": False, "group": True, "owner": False, "admin": False},
     "/panel": {"private": True, "group": False, "owner": False, "admin": False},
     

@@ -161,7 +161,7 @@ async def on_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         try:
             # Use user_chat_id to contact users who sent join request (requires bot to have can_invite_users permission)
             target_chat_id = req.user_chat_id
-            msg = await context.bot.send_message(target_chat_id, text, reply_markup=kb)
+            msg = await context.bot.send_message(target_chat_id, text, reply_markup=kb, parse_mode="HTML")
             log.info(f"Successfully sent rules to user {uid} for group {gid}")
             # Store message ID so we can edit it later when user clicks the deep link
             context.application.user_data[uid][f"join_rules_msg_{gid}"] = msg.message_id
@@ -206,7 +206,7 @@ async def on_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 )
             
             target_chat_id = req.user_chat_id
-            await context.bot.send_message(target_chat_id, text, reply_markup=kb_dm)
+            await context.bot.send_message(target_chat_id, text, reply_markup=kb_dm, parse_mode="HTML")
             # Mark that we sent rules to avoid duplication when user clicks deep-link
             recent_messages_key = f"rules_sent_{gid}_{req.from_user.id}"
             context.user_data[recent_messages_key] = True
@@ -244,14 +244,61 @@ async def on_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 )
                 deep_link = f"https://t.me/{bot_username}?start={payload}"
                 lang = lang_code
-                text_w = t(
-                    lang,
-                    "welcome.must_accept",
-                    first_name=req.from_user.first_name or "",
-                    group_title=req.chat.title or "",
-                )
+                
+                # Create HTML user mention for clickable profile link
+                user_mention = f'<a href="tg://user?id={req.from_user.id}">{req.from_user.first_name or "Member"}</a>'
+                
+                # Get custom welcome template if set
+                welcome_template = None
+                async with db.SessionLocal() as s:  # type: ignore
+                    wcfg = await SettingsRepo(s).get(gid, "welcome") or {}
+                    welcome_template = wcfg.get("template")
+                
+                # Check if admin has set a custom template
+                if welcome_template:
+                    # Process admin's custom template
+                    custom_text = welcome_template.replace("{first_name}", req.from_user.first_name or "Member")
+                    custom_text = custom_text.replace("{user_mention}", user_mention)
+                    
+                    # Format other placeholders
+                    try:
+                        custom_text = custom_text.format(
+                            group_title=req.chat.title or "",
+                            user_id=req.from_user.id,
+                            username=f"@{req.from_user.username}" if req.from_user.username else ""
+                        )
+                    except KeyError:
+                        # If formatting fails, just use the template with basic replacements
+                        pass
+                    
+                    # ALWAYS add welcome header with user mention (localized)
+                    header = t(lang, "welcome.header_greeting", user_mention=user_mention)
+                    text_w = f"{header}\n\n{custom_text}"
+                    
+                    # Add the rules acceptance note if not already in template (localized)
+                    if "accept" not in text_w.lower() and "rules" not in text_w.lower():
+                        reminder = t(lang, "welcome.rules_reminder")
+                        text_w += f"\n\n{reminder}"
+                else:
+                    # Use professional welcome message with HTML mention
+                    text_w = t(
+                        lang,
+                        "welcome.must_accept_professional",
+                        user_mention=user_mention,
+                        group_title=req.chat.title or "",
+                    )
+                    
+                    # Fallback if key doesn't exist
+                    if text_w == "welcome.must_accept_professional":
+                        text_w = (
+                            f"👋 Welcome {user_mention}!\n\n"
+                            f"You've joined <b>{req.chat.title or 'this group'}</b>.\n\n"
+                            f"⚠️ <b>Important:</b> To participate in this community, you must first read and accept our rules.\n\n"
+                            f"Please click the button below to review the rules and unlock messaging."
+                        )
+                
                 kb = InlineKeyboardMarkup([[InlineKeyboardButton(t(lang, "welcome.read_accept"), url=deep_link)]])
-                m = await context.bot.send_message(gid, text_w, reply_markup=kb)
+                m = await context.bot.send_message(gid, text_w, reply_markup=kb, parse_mode="HTML")
                 # Schedule auto-delete if TTL configured
                 async def _delete_job(ctx: ContextTypes.DEFAULT_TYPE):
                     try:
