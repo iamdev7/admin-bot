@@ -463,7 +463,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             context.user_data[recent_messages_key] = True
             # Clear flag after some time
             async def clear_flag(ctx: ContextTypes.DEFAULT_TYPE):
-                ctx.user_data.pop(recent_messages_key, None)
+                if ctx.user_data is not None:
+                    ctx.user_data.pop(recent_messages_key, None)
             context.job_queue.run_once(clear_flag, when=300)  # Clear after 5 minutes
             
             return

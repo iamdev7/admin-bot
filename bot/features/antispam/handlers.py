@@ -668,7 +668,11 @@ async def enforce_link_policy(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Decide action based on each item (URL or username)
     decided_action: str | None = None
     
-    # Process URLs
+    # Process URLs with priority order:
+    # 1. Denylist (blocked domains) - Always apply restrictions
+    # 2. Allowlist (allowed domains) - Always allow, overrides everything else
+    # 3. Type-specific actions
+    # 4. Block all setting
     for u in urls:
         host = (urlparse(u).hostname or "").lower()
         if not host:
@@ -682,9 +686,15 @@ async def enforce_link_policy(update: Update, context: ContextTypes.DEFAULT_TYPE
             if path.startswith(f"/{group_name_without_at}/") or path == f"/{group_name_without_at}":
                 continue  # Skip this URL, it's the group's own link
         
-        # Allowlist overrides everything
+        # Priority 1: Check if domain is explicitly blocked (denylist has highest priority)
+        if in_list(host, denylist):
+            decided_action = default_action
+            break
+        
+        # Priority 2: Check if domain is explicitly allowed (overrides block_all and type actions)
         if in_list(host, allowlist):
             continue
+        
         # Per-type action
         cat = classify_link(u)
         act = type_actions.get(cat)
@@ -693,8 +703,9 @@ async def enforce_link_policy(update: Update, context: ContextTypes.DEFAULT_TYPE
             break
         if act == "allow":
             continue
-        # Block all or denylist
-        if block_all or in_list(host, denylist):
+        
+        # Block all (but already checked allowlist above)
+        if block_all:
             decided_action = default_action
             break
     

@@ -601,30 +601,23 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                         await SettingsRepo(s).set(gid, "links", cfg)
                         await s.commit()
                     return await show_links(update, context, gid)
-        if len(parts) >= 5 and parts[3] == "locks":
-            if parts[4] == "open":
-                return await show_locks(update, context, gid)
-            if parts[4] == "forwards" and len(parts) >= 6:
-                action = parts[5]
-                if action in {"allow", "delete", "warn", "mute", "ban"}:
+            if parts[4] == "allow" and len(parts) >= 6:
+                if parts[5] == "add":
+                    context.user_data[("await_link_allow_domain", gid)] = True
+                    lang = I18N.pick_lang(update)
+                    await update.callback_query.answer()
+                    return await update.effective_message.reply_text(t(lang, "panel.links.allow_add_prompt"))
+                if parts[5] == "del" and len(parts) >= 7:
+                    dom = parts[6]
                     async with db.SessionLocal() as s:  # type: ignore
-                        locks = await SettingsRepo(s).get(gid, "locks") or {}
-                        locks["forwards"] = action
-                        await SettingsRepo(s).set(gid, "locks", locks)
+                        cfg = await SettingsRepo(s).get(gid, "links") or {"allowlist": []}
+                        allow = set(cfg.get("allowlist", []))
+                        if dom in allow:
+                            allow.remove(dom)
+                        cfg["allowlist"] = list(allow)
+                        await SettingsRepo(s).set(gid, "links", cfg)
                         await s.commit()
-                    return await show_locks(update, context, gid)
-            if parts[4] == "media" and len(parts) >= 7:
-                mtype = parts[5]
-                action = parts[6]
-                if action in {"allow", "delete", "warn", "mute", "ban"}:
-                    async with db.SessionLocal() as s:  # type: ignore
-                        locks = await SettingsRepo(s).get(gid, "locks") or {}
-                        media = locks.get("media") or {}
-                        media[mtype] = action
-                        locks["media"] = media
-                        await SettingsRepo(s).set(gid, "locks", locks)
-                        await s.commit()
-                    return await show_locks(update, context, gid)
+                    return await show_links(update, context, gid)
             if parts[4] == "night" and len(parts) >= 6:
                 async with db.SessionLocal() as s:  # type: ignore
                     night = await SettingsRepo(s).get(gid, "links.night") or {"enabled": False, "from_h": 0, "to_h": 6, "tz_offset_min": 0, "block_all": True}
@@ -656,23 +649,30 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     await SettingsRepo(s).set(gid, "links", cfg)
                     await s.commit()
                 return await show_links(update, context, gid)
-            if parts[4] == "allow" and len(parts) >= 6:
-                if parts[5] == "add":
-                    context.user_data[("await_link_allow_domain", gid)] = True
-                    lang = I18N.pick_lang(update)
-                    await update.callback_query.answer()
-                    return await update.effective_message.reply_text(t(lang, "panel.links.allow_add_prompt"))
-                if parts[5] == "del" and len(parts) >= 7:
-                    dom = parts[6]
+        if len(parts) >= 5 and parts[3] == "locks":
+            if parts[4] == "open":
+                return await show_locks(update, context, gid)
+            if parts[4] == "forwards" and len(parts) >= 6:
+                action = parts[5]
+                if action in {"allow", "delete", "warn", "mute", "ban"}:
                     async with db.SessionLocal() as s:  # type: ignore
-                        cfg = await SettingsRepo(s).get(gid, "links") or {"allowlist": []}
-                        allow = set(cfg.get("allowlist", []))
-                        if dom in allow:
-                            allow.remove(dom)
-                        cfg["allowlist"] = list(allow)
-                        await SettingsRepo(s).set(gid, "links", cfg)
+                        locks = await SettingsRepo(s).get(gid, "locks") or {}
+                        locks["forwards"] = action
+                        await SettingsRepo(s).set(gid, "locks", locks)
                         await s.commit()
-                    return await show_links(update, context, gid)
+                    return await show_locks(update, context, gid)
+            if parts[4] == "media" and len(parts) >= 7:
+                mtype = parts[5]
+                action = parts[6]
+                if action in {"allow", "delete", "warn", "mute", "ban"}:
+                    async with db.SessionLocal() as s:  # type: ignore
+                        locks = await SettingsRepo(s).get(gid, "locks") or {}
+                        media = locks.get("media") or {}
+                        media[mtype] = action
+                        locks["media"] = media
+                        await SettingsRepo(s).set(gid, "locks", locks)
+                        await s.commit()
+                    return await show_locks(update, context, gid)
         if len(parts) >= 5 and parts[3] == "auto":
             if parts[4] == "toggle" and len(parts) >= 6:
                 job_id = int(parts[5])
