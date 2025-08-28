@@ -43,6 +43,7 @@ Modular, extensible Telegram group‑management bot using python‑telegram‑bo
   - Language: per‑group EN/AR override.
   - Onboarding: auto‑approve toggle; require rules acceptance (DM accept before join); Captcha (button/math, timeout).
   - Automations: announcements (once/repeat), rotate pin, timed unmute/unban.
+  - AI Assistant: Enable GPT-powered responses for group chats (requires OpenAI API key).
 - Moderation: warn‑limit, delete‑offense toggle, ephemeral replies (off/10s/30s), Recent Violators with quick actions.
 - Audit: recent moderation events (paged).
 
@@ -70,6 +71,21 @@ Environment=PYTHONUNBUFFERED=1
 WantedBy=multi-user.target
 ```
 Then: `systemctl daemon-reload && systemctl enable --now telegram-admin-bot`.
+
+## AI Assistant Feature
+The bot includes an optional AI-powered assistant that can respond intelligently to messages in groups.
+
+### Setup
+1. Get an OpenAI API key from [platform.openai.com](https://platform.openai.com/api-keys)
+2. Add to your `.env` file: `OPENAI_API_KEY=sk-your-key-here`
+3. Enable for specific groups via `/panel` → AI Assistant tab
+4. Configure settings: model (GPT-5 Mini 2025-08-07 default), temperature, response mode
+
+### Usage
+- **Reply Mode**: Bot responds when users reply to its messages
+- **Mention Mode**: Bot responds to @mentions and trigger words
+- Supports context-aware conversations
+- Professionally handles various message types
 
 Notes
 - No Docker/CI/tests included by design. Use `ruff`, `black`, `mypy` locally.

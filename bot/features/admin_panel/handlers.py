@@ -135,9 +135,12 @@ def tabs_keyboard(lang: str, gid: int) -> InlineKeyboardMarkup:
         InlineKeyboardButton(t(lang, "panel.tab.language"), callback_data=f"panel:group:{gid}:tab:language"),
         InlineKeyboardButton(t(lang, "panel.tab.onboarding"), callback_data=f"panel:group:{gid}:tab:onboarding"),
         InlineKeyboardButton(t(lang, "panel.tab.automations"), callback_data=f"panel:group:{gid}:tab:automations"),
+        InlineKeyboardButton(t(lang, "panel.tab.ai"), callback_data=f"panel:group:{gid}:tab:ai"),
+    ]
+    row3 = [
         InlineKeyboardButton(t(lang, "panel.tab.audit"), callback_data=f"panel:group:{gid}:tab:audit"),
     ]
-    return InlineKeyboardMarkup([tabs, row2, [InlineKeyboardButton(t(lang, "panel.back"), callback_data="panel:back")]])
+    return InlineKeyboardMarkup([tabs, row2, row3, [InlineKeyboardButton(t(lang, "panel.back"), callback_data="panel:back")]])
 
 
 async def open_group(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
@@ -357,6 +360,8 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 return await show_automations(update, context, gid)
             if tab == "onboarding":
                 return await show_onboarding(update, context, gid)
+            if tab == "ai":
+                return await show_ai(update, context, gid)
             if tab == "audit":
                 return await show_audit(update, context, gid, 0)
 
@@ -673,6 +678,47 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                         await SettingsRepo(s).set(gid, "locks", locks)
                         await s.commit()
                     return await show_locks(update, context, gid)
+        if len(parts) >= 5 and parts[3] == "ai":
+            if parts[4] == "toggle":
+                async with db.SessionLocal() as s:  # type: ignore
+                    settings = await SettingsRepo(s).get(gid, "ai_response") or {}
+                    settings["enabled"] = not settings.get("enabled", False)
+                    await SettingsRepo(s).set(gid, "ai_response", settings)
+                    await s.commit()
+                return await show_ai(update, context, gid)
+            
+            if parts[4] == "model" and len(parts) >= 6:
+                model = parts[5]
+                # Support both specific version and general model names
+                if model in ["gpt-5-mini-2025-08-07", "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"]:
+                    async with db.SessionLocal() as s:  # type: ignore
+                        settings = await SettingsRepo(s).get(gid, "ai_response") or {}
+                        settings["model"] = model
+                        await SettingsRepo(s).set(gid, "ai_response", settings)
+                        await s.commit()
+                    return await show_ai(update, context, gid)
+            
+            if parts[4] == "reply_mode":
+                async with db.SessionLocal() as s:  # type: ignore
+                    settings = await SettingsRepo(s).get(gid, "ai_response") or {}
+                    settings["reply_only"] = not settings.get("reply_only", True)
+                    await SettingsRepo(s).set(gid, "ai_response", settings)
+                    await s.commit()
+                return await show_ai(update, context, gid)
+            
+            if parts[4] == "temp" and len(parts) >= 6:
+                try:
+                    temp = float(parts[5])
+                    if 0.0 <= temp <= 2.0:
+                        async with db.SessionLocal() as s:  # type: ignore
+                            settings = await SettingsRepo(s).get(gid, "ai_response") or {}
+                            settings["temperature"] = temp
+                            await SettingsRepo(s).set(gid, "ai_response", settings)
+                            await s.commit()
+                        return await show_ai(update, context, gid)
+                except ValueError:
+                    pass
+        
         if len(parts) >= 5 and parts[3] == "auto":
             if parts[4] == "toggle" and len(parts) >= 6:
                 job_id = int(parts[5])
@@ -1533,6 +1579,93 @@ async def rule_config(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: i
         [InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:rules:list:0")],
     ]
     await update.effective_message.edit_text(f"Rule #{rid} [{f.type}/{f.action}]", reply_markup=InlineKeyboardMarkup(kb))
+
+
+async def show_ai(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:
+    """Show AI response settings for a group."""
+    import os
+    lang = _panel_lang(update, gid)
+    
+    # Check if OpenAI API key is configured
+    api_key_configured = bool(os.getenv("OPENAI_API_KEY"))
+    
+    async with db.SessionLocal() as s:  # type: ignore
+        settings = await SettingsRepo(s).get(gid, "ai_response") or {
+            "enabled": False,
+            "model": "gpt-5-mini-2025-08-07",
+            "max_tokens": 500,
+            "temperature": 0.7,
+            "reply_only": True,
+        }
+    
+    # Build status text
+    text = f"**{t(lang, 'panel.ai.title')}**\n\n"
+    
+    if not api_key_configured:
+        text += f"⚠️ {t(lang, 'panel.ai.no_api_key')}\n\n"
+    
+    status = "✅ " + t(lang, "panel.ai.status_enabled") if settings["enabled"] else "❌ " + t(lang, "panel.ai.status_disabled")
+    text += f"{t(lang, 'panel.ai.status')}: {status}\n"
+    model_name = settings.get('model', 'gpt-5-mini-2025-08-07')
+    text += f"{t(lang, 'panel.ai.model')}: {model_name}\n"
+    text += f"{t(lang, 'panel.ai.max_tokens')}: {settings.get('max_tokens', 500)}\n"
+    
+    # GPT-5 models only support temperature=1.0
+    if "gpt-5" in model_name:
+        text += f"{t(lang, 'panel.ai.temperature')}: 1.0 (Fixed for GPT-5)\n"
+    else:
+        text += f"{t(lang, 'panel.ai.temperature')}: {settings.get('temperature', 0.7)}\n"
+    
+    reply_mode = t(lang, "panel.ai.reply_only_yes") if settings.get("reply_only", True) else t(lang, "panel.ai.reply_only_no")
+    text += f"{t(lang, 'panel.ai.reply_mode')}: {reply_mode}\n"
+    
+    # Build keyboard
+    rows = []
+    
+    # Enable/Disable toggle
+    if api_key_configured:
+        if settings["enabled"]:
+            rows.append([InlineKeyboardButton(
+                "🔴 " + t(lang, "panel.ai.disable"),
+                callback_data=f"panel:group:{gid}:ai:toggle"
+            )])
+        else:
+            rows.append([InlineKeyboardButton(
+                "🟢 " + t(lang, "panel.ai.enable"),
+                callback_data=f"panel:group:{gid}:ai:toggle"
+            )])
+    
+        # Model selection
+        rows.append([
+            InlineKeyboardButton("GPT-5 Mini", callback_data=f"panel:group:{gid}:ai:model:gpt-5-mini-2025-08-07"),
+            InlineKeyboardButton("GPT-4o", callback_data=f"panel:group:{gid}:ai:model:gpt-4o"),
+            InlineKeyboardButton("GPT-4o Mini", callback_data=f"panel:group:{gid}:ai:model:gpt-4o-mini"),
+        ])
+        
+        # Reply mode toggle
+        reply_btn_text = "📨 Reply Only" if not settings.get("reply_only", True) else "💬 All Mentions"
+        rows.append([InlineKeyboardButton(
+            reply_btn_text,
+            callback_data=f"panel:group:{gid}:ai:reply_mode"
+        )])
+        
+        # Temperature adjustment (not available for GPT-5 models)
+        current_model = settings.get("model", "gpt-5-mini-2025-08-07")
+        if "gpt-5" not in current_model:
+            rows.append([
+                InlineKeyboardButton("🧊 Focused", callback_data=f"panel:group:{gid}:ai:temp:0.3"),
+                InlineKeyboardButton("⚖️ Balanced", callback_data=f"panel:group:{gid}:ai:temp:0.7"),
+                InlineKeyboardButton("🎨 Creative", callback_data=f"panel:group:{gid}:ai:temp:1.0"),
+            ])
+    
+    # Back button
+    rows.append([InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:home")])
+    
+    await update.effective_message.edit_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(rows),
+        parse_mode="Markdown"
+    )
 
 
 async def show_automations(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) -> None:

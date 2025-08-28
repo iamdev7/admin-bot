@@ -24,6 +24,7 @@ if PYDANTIC_V2:
         OWNER_IDS: List[int] = []
         DATABASE_URL: str = "sqlite+aiosqlite:///./data/bot.db"
         DEFAULT_LANG: str = "en"
+        OPENAI_API_KEY: str = ""  # Optional, for AI Assistant feature
 
         @field_validator("OWNER_IDS", mode="before")
         @classmethod
@@ -49,6 +50,7 @@ else:
         OWNER_IDS: List[int] = []
         DATABASE_URL: str = "sqlite+aiosqlite:///./data/bot.db"
         DEFAULT_LANG: str = "en"
+        OPENAI_API_KEY: str = ""  # Optional, for AI Assistant feature
 
         @validator("OWNER_IDS", pre=True)
         @classmethod
@@ -75,6 +77,7 @@ settings = Settings(
     BOT_TOKEN=os.getenv("BOT_TOKEN", ""),
     OWNER_IDS=os.getenv("OWNER_IDS", ""),
     DATABASE_URL=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/bot.db"),
-    DEFAULT_LANG=os.getenv("DEFAULT_LANG", "en")
+    DEFAULT_LANG=os.getenv("DEFAULT_LANG", "en"),
+    OPENAI_API_KEY=os.getenv("OPENAI_API_KEY", "")
 )
 

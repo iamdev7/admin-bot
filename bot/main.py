@@ -44,6 +44,7 @@ from .features.verification import register as register_verification
 from .features.topics import register as register_topics
 from .features.bot_admin import register as register_bot_admin
 from .features.global_enforcement import register as register_global_enforcement
+from .features.ai_response import register_handlers as register_ai_response
 
 
 async def on_startup(app: Application) -> None:
@@ -118,6 +119,7 @@ def make_app() -> Application:
     register_onboarding(app)
     register_verification(app)
     register_topics(app)
+    register_ai_response(app)  # Register AI response handlers
 
     # Events & callbacks - catch unhandled callbacks to prevent errors
     async def _noop(_: Update, __: ContextTypes.DEFAULT_TYPE) -> None:
