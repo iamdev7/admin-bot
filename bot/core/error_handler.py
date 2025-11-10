@@ -2,26 +2,28 @@
 
 from __future__ import annotations
 
-import logging
-import traceback
+import asyncio
 import html
 import json
+import logging
+import traceback
+from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Optional
+from typing import Any, TypeVar
 
 from telegram import Update
 from telegram.error import (
     BadRequest,
-    ChatMigrated,
     Forbidden,
     NetworkError,
+    RetryAfter,
     TelegramError,
     TimedOut,
 )
 from telegram.ext import ContextTypes
 
 from .config import settings
-from .i18n import t, I18N
+from .i18n import I18N, t
 
 # Configure logger
 log = logging.getLogger(__name__)
@@ -40,11 +42,14 @@ IGNORE_ERRORS = (
 )
 
 
+T = TypeVar("T")
+
+
 class ErrorHandler:
     """Centralized error handling with admin notifications."""
     
     @staticmethod
-    async def handle_error(update: Optional[Update], context: ContextTypes.DEFAULT_TYPE) -> None:
+    async def handle_error(update: Update | None, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle errors and notify admins."""
         try:
             # Log the error with traceback
@@ -80,13 +85,12 @@ class ErrorHandler:
             
             # Send user-friendly message if possible
             if update and update.effective_message:
-                try:
-                    lang = I18N.pick_lang(update)
-                    await update.effective_message.reply_text(
-                        t(lang, "errors.generic")
-                    )
-                except Exception:
-                    pass  # Silently fail if we can't notify the user
+                lang = I18N.pick_lang(update)
+                await ErrorHandler._send_with_retry(
+                    update.effective_message.reply_text,
+                    t(lang, "errors.generic"),
+                    retry_label="reply_text",
+                )
                     
         except Exception as e:
             log.error(f"Error in error handler: {e}")
@@ -96,7 +100,7 @@ class ErrorHandler:
         error: Exception,
         tb_string: str,
         update_str: str,
-        update: Optional[Update]
+        update: Update | None
     ) -> str:
         """Format error message for admin notification."""
         # Get user and chat info
@@ -127,7 +131,7 @@ class ErrorHandler:
         
         # Build message
         message_parts = [
-            f"<b>🚨 Bot Error Report</b>",
+            "<b>🚨 Bot Error Report</b>",
             f"<b>Time:</b> {timestamp}",
             f"<b>Error:</b> <code>{html.escape(str(error))}</code>",
         ]
@@ -160,30 +164,79 @@ class ErrorHandler:
                 # Split message if too long
                 if len(error_text) > 4000:
                     # Send first part with main info
-                    await context.bot.send_message(
+                    await ErrorHandler._send_with_retry(
+                        context.bot.send_message,
                         chat_id=admin_id,
                         text=error_text[:4000],
                         parse_mode="HTML",
                         disable_notification=False,
+                        retry_label=f"notify_admin_{admin_id}",
                     )
                     # Send rest as follow-up
                     remaining = error_text[4000:]
                     if remaining:
-                        await context.bot.send_message(
+                        await ErrorHandler._send_with_retry(
+                            context.bot.send_message,
                             chat_id=admin_id,
                             text=f"<b>Continued...</b>\n{remaining[:4000]}",
                             parse_mode="HTML",
                             disable_notification=True,
+                            retry_label=f"notify_admin_{admin_id}_continued",
                         )
                 else:
-                    await context.bot.send_message(
+                    await ErrorHandler._send_with_retry(
+                        context.bot.send_message,
                         chat_id=admin_id,
                         text=error_text,
                         parse_mode="HTML",
                         disable_notification=False,
+                        retry_label=f"notify_admin_{admin_id}",
                     )
             except Exception as e:
                 log.error(f"Could not send error to admin {admin_id}: {e}")
+
+    @staticmethod
+    async def _send_with_retry(
+        func: Callable[..., Awaitable[T]],
+        *args: Any,
+        retry_label: str = "send_message",
+        max_attempts: int = 3,
+        **kwargs: Any,
+    ) -> T | None:
+        """Best-effort wrapper around Telegram API calls with backoff."""
+        attempt = 0
+        while attempt < max_attempts:
+            try:
+                return await func(*args, **kwargs)
+            except RetryAfter as exc:
+                attempt += 1
+                wait_time = int(exc.retry_after) + 1
+                log.warning(
+                    "Flood control on %s, retrying in %ss (attempt %s/%s)",
+                    retry_label,
+                    wait_time,
+                    attempt,
+                    max_attempts,
+                )
+                await asyncio.sleep(wait_time)
+            except TimedOut:
+                attempt += 1
+                wait_time = 2 ** attempt
+                log.warning(
+                    "Timeout on %s, retrying in %ss (attempt %s/%s)",
+                    retry_label,
+                    wait_time,
+                    attempt,
+                    max_attempts,
+                )
+                await asyncio.sleep(wait_time)
+            except TelegramError as exc:
+                log.error("Telegram error on %s: %s", retry_label, exc)
+                break
+            except Exception as exc:  # noqa: BLE001 - final safeguard
+                log.error("Unexpected error on %s: %s", retry_label, exc)
+                break
+        return None
     
     @staticmethod
     def handle_bad_request(error: BadRequest) -> bool:

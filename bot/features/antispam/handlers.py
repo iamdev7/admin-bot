@@ -30,7 +30,7 @@ from ...core.i18n import I18N, t
 from ...core.ephemeral import reply_ephemeral
 from ...core.permissions import require_group_admin
 from ...infra import db
-from ...infra.repos import AuditRepo, FiltersRepo
+from ...infra.repos import AuditRepo, FiltersRepo, WarnsRepo
 from ...infra.settings_repo import SettingsRepo
 
 log = logging.getLogger(__name__)
@@ -196,7 +196,9 @@ async def apply_global_penalty(
     user_id: int,
     action: str,
     matched_word: str,
-    duration: Optional[int] = None
+    duration: Optional[int] = None,
+    *,
+    skip_group_id: Optional[int] = None,
 ) -> None:
     """Apply penalty to user across ALL groups where bot is admin."""
     # Get all groups from database
@@ -209,6 +211,8 @@ async def apply_global_penalty(
     
     applied_count = 0
     for group in groups:
+        if skip_group_id is not None and group.id == skip_group_id:
+            continue
         try:
             if action == "mute" and duration:
                 until = int(time.time()) + duration
@@ -227,10 +231,51 @@ async def apply_global_penalty(
                     until_date=until
                 )
                 applied_count += 1
+            elif action == "warn":
+                lang = I18N.get_group_lang(group.id) or "en"
+                created_by = getattr(context.bot, "id", 0) or 0
+                escalate_to_mute = False
+                mute_seconds = None
+                try:
+                    async with db.SessionLocal() as s:  # type: ignore
+                        warns_repo = WarnsRepo(s)
+                        await warns_repo.add(group.id, user_id, reason="global_blacklist", created_by=created_by)
+                        warn_count = await warns_repo.count(group.id, user_id)
+                        moderation_cfg = await SettingsRepo(s).get(group.id, "moderation") or {}
+                        warn_limit = int(moderation_cfg.get("warn_limit", 3) or 3)
+                        if warn_limit and warn_count >= warn_limit:
+                            escalate_to_mute = True
+                            await warns_repo.reset(group.id, user_id)
+                        await s.commit()
+                except Exception as exc:  # pragma: no cover - safety net
+                    log.debug("Could not persist global warn for user %s in group %s: %s", user_id, group.id, exc)
+                    continue
+
+                # Notify group about the warning
+                try:
+                    await context.bot.send_message(group.id, t(lang, "content.warn"))
+                except Exception as exc:
+                    log.debug("Failed to notify group %s about global warn: %s", group.id, exc)
+
+                if escalate_to_mute:
+                    cfg = await get_antispam_config(group.id)
+                    mute_seconds = int(cfg.get("mute_seconds", DEFAULTS["mute_seconds"]))
+                    until = int(time.time()) + mute_seconds
+                    try:
+                        await context.bot.restrict_chat_member(
+                            group.id,
+                            user_id,
+                            permissions=ChatPermissions(can_send_messages=False),
+                            until_date=until,
+                        )
+                        await context.bot.send_message(group.id, t(lang, "content.muted"))
+                    except Exception as exc:
+                        log.debug("Failed to escalate global warn to mute for user %s in group %s: %s", user_id, group.id, exc)
+                applied_count += 1
         except Exception as e:
             # User might not be in this group or bot might not have perms
             log.debug(f"Could not apply {action} to user {user_id} in group {group.id}: {e}")
-    
+
     if applied_count > 0:
         log.info(f"Applied global {action} to user {user_id} in {applied_count} groups for violating: {matched_word}")
 
@@ -296,7 +341,7 @@ async def enforce_global_blacklist(update: Update, context: ContextTypes.DEFAULT
         await handle_warn_escalation(gid, uid, update, context)
         
         # Apply warn to ALL groups where user is member
-        await apply_global_penalty(context, uid, "warn", matched)
+        await apply_global_penalty(context, uid, "warn", matched, skip_group_id=gid)
         return True
     
     if action == "mute":
@@ -305,7 +350,7 @@ async def enforce_global_blacklist(update: Update, context: ContextTypes.DEFAULT
         await context.bot.send_message(gid, t(lang, "content.muted"))
         
         # Apply mute to ALL groups where user is member
-        await apply_global_penalty(context, uid, "mute", matched, duration)
+        await apply_global_penalty(context, uid, "mute", matched, duration, skip_group_id=gid)
         return True
     
     if action == "ban":
@@ -314,7 +359,7 @@ async def enforce_global_blacklist(update: Update, context: ContextTypes.DEFAULT
         await context.bot.send_message(gid, t(lang, "content.banned"))
         
         # Apply ban to ALL groups where user is member
-        await apply_global_penalty(context, uid, "ban", matched, duration)
+        await apply_global_penalty(context, uid, "ban", matched, duration, skip_group_id=gid)
         return True
     
     return True

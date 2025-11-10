@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 # Try to import from pydantic v2 first, then fall back to v1
 try:
-    from pydantic_settings import BaseSettings
+    from pydantic_settings import BaseSettings, SettingsConfigDict
     from pydantic import field_validator
     PYDANTIC_V2 = True
 except ImportError:
@@ -41,9 +41,11 @@ if PYDANTIC_V2:
                 return result
             return []
 
-        class Config:
-            env_file = ".env"
-            env_file_encoding = "utf-8"
+        model_config = SettingsConfigDict(
+            env_file=".env",
+            env_file_encoding="utf-8",
+            extra="ignore",
+        )
 else:
     class Settings(BaseSettings):
         BOT_TOKEN: str
@@ -70,6 +72,7 @@ else:
         class Config:
             env_file = ".env"
             env_file_encoding = "utf-8"
+            extra = "ignore"
 
 
 # Force environment variables to be loaded
@@ -80,4 +83,3 @@ settings = Settings(
     DEFAULT_LANG=os.getenv("DEFAULT_LANG", "en"),
     OPENAI_API_KEY=os.getenv("OPENAI_API_KEY", "")
 )
-
