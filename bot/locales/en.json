@@ -1,5 +1,5 @@
 {
-  "bot.name": "Protection Code",
+  "bot.name": "FJ",
   "bot.button.updates": "📢 Updates Channel",
   "bot.button.manage": "⚙️ Manage Groups",
   "start.welcome": "👋 Hello {first_name}! Use /panel in private to manage groups.",
@@ -269,7 +269,7 @@
   "common.invalid_json": "Invalid JSON.",
   "privacy.policy": "🔒 <b>Privacy Policy</b>\n\n<b>What We Store</b>\n• Group settings and configurations only\n• No personal messages are stored\n• No user data is collected\n\n<b>Data Usage</b>\n• Settings are used to manage group features\n• No data is sold or shared with third parties\n• Data is deleted when bot is removed from group\n\n<b>Security</b>\n• All data transmissions are encrypted\n• Access is restricted to bot operations only\n\n<b>Contact</b>\nFor any concerns, contact the developer:\n👨‍💻 Developer: @codei8\n\n<i>Last updated: January 2025</i>",
   "panel.ai.title": "AI Assistant Settings",
-  "panel.ai.no_api_key": "OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.",
+  "panel.ai.no_api_key": "AI API key not configured. Please set GEMINI_API_KEY or OPENAI_API_KEY.",
   "panel.ai.status": "Status",
   "panel.ai.status_enabled": "Enabled",
   "panel.ai.status_disabled": "Disabled",

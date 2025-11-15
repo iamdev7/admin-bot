@@ -690,7 +690,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             if parts[4] == "model" and len(parts) >= 6:
                 model = parts[5]
                 # Support both specific version and general model names
-                if model in ["gpt-5-mini-2025-08-07", "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"]:
+                if model in ["gemini-2.5-flash", "gpt-5-mini-2025-08-07", "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"]:
                     async with db.SessionLocal() as s:  # type: ignore
                         settings = await SettingsRepo(s).get(gid, "ai_response") or {}
                         settings["model"] = model
@@ -1586,14 +1586,16 @@ async def show_ai(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) 
     import os
     lang = _panel_lang(update, gid)
     
-    # Check if OpenAI API key is configured
-    api_key_configured = bool(os.getenv("OPENAI_API_KEY"))
+    # Check which AI providers are configured
+    gemini_configured = bool(os.getenv("GEMINI_API_KEY"))
+    openai_configured = bool(os.getenv("OPENAI_API_KEY"))
+    api_key_configured = gemini_configured or openai_configured
     
     async with db.SessionLocal() as s:  # type: ignore
         settings = await SettingsRepo(s).get(gid, "ai_response") or {
             "enabled": False,
-            "model": "gpt-5-mini-2025-08-07",
-            "max_tokens": 500,
+            "model": "gemini-2.5-flash",
+            "max_tokens": 800,
             "temperature": 0.7,
             "reply_only": True,
         }
@@ -1606,7 +1608,7 @@ async def show_ai(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) 
     
     status = "✅ " + t(lang, "panel.ai.status_enabled") if settings["enabled"] else "❌ " + t(lang, "panel.ai.status_disabled")
     text += f"{t(lang, 'panel.ai.status')}: {status}\n"
-    model_name = settings.get('model', 'gpt-5-mini-2025-08-07')
+    model_name = settings.get('model', 'gemini-2.5-flash')
     text += f"{t(lang, 'panel.ai.model')}: {model_name}\n"
     text += f"{t(lang, 'panel.ai.max_tokens')}: {settings.get('max_tokens', 500)}\n"
     
@@ -1634,13 +1636,21 @@ async def show_ai(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) 
                 "🟢 " + t(lang, "panel.ai.enable"),
                 callback_data=f"panel:group:{gid}:ai:toggle"
             )])
-    
+
         # Model selection
-        rows.append([
-            InlineKeyboardButton("GPT-5 Mini", callback_data=f"panel:group:{gid}:ai:model:gpt-5-mini-2025-08-07"),
-            InlineKeyboardButton("GPT-4o", callback_data=f"panel:group:{gid}:ai:model:gpt-4o"),
-            InlineKeyboardButton("GPT-4o Mini", callback_data=f"panel:group:{gid}:ai:model:gpt-4o-mini"),
-        ])
+        if gemini_configured:
+            rows.append([
+                InlineKeyboardButton(
+                    "Gemini 2.5 Flash",
+                    callback_data=f"panel:group:{gid}:ai:model:gemini-2.5-flash",
+                )
+            ])
+        if openai_configured:
+            rows.append([
+                InlineKeyboardButton("GPT-5 Mini", callback_data=f"panel:group:{gid}:ai:model:gpt-5-mini-2025-08-07"),
+                InlineKeyboardButton("GPT-4o", callback_data=f"panel:group:{gid}:ai:model:gpt-4o"),
+                InlineKeyboardButton("GPT-4o Mini", callback_data=f"panel:group:{gid}:ai:model:gpt-4o-mini"),
+            ])
         
         # Reply mode toggle
         reply_btn_text = "📨 Reply Only" if not settings.get("reply_only", True) else "💬 All Mentions"
@@ -1650,7 +1660,7 @@ async def show_ai(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) 
         )])
         
         # Temperature adjustment (not available for GPT-5 models)
-        current_model = settings.get("model", "gpt-5-mini-2025-08-07")
+        current_model = settings.get("model", "gemini-2.5-flash")
         if "gpt-5" not in current_model:
             rows.append([
                 InlineKeyboardButton("🧊 Focused", callback_data=f"panel:group:{gid}:ai:temp:0.3"),
