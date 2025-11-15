@@ -28,7 +28,7 @@ A production-grade, extensible Telegram group management bot built with modern a
 - Admin synchronization across groups
 
 ### AI-Powered Responses (Optional)
-- Intelligent message replies using OpenAI
+- Intelligent message replies using Google Gemini
 - Context-aware group interactions
 - Configurable per-group settings
 
@@ -43,7 +43,7 @@ A production-grade, extensible Telegram group management bot built with modern a
 - **python-telegram-bot v22**: Latest async Telegram Bot API wrapper
 - **SQLAlchemy 2.0**: Async ORM with SQLite backend
 - **Pydantic**: Configuration validation
-- **OpenAI API**: Optional AI response capabilities
+- **Google Gemini API**: Optional AI response capabilities
 
 ## Installation
 
@@ -83,7 +83,7 @@ A production-grade, extensible Telegram group management bot built with modern a
    DEFAULT_LANG=en
 
    # Optional: For AI features
-   # OPENAI_API_KEY=sk-your-openai-api-key
+   # GEMINI_API_KEY=your_gemini_api_key
    ```
 
 5. **Initialize the database**
@@ -111,7 +111,7 @@ A production-grade, extensible Telegram group management bot built with modern a
 | `OWNER_IDS` | Yes | Comma-separated list of bot owner Telegram IDs | - |
 | `DATABASE_URL` | No | SQLAlchemy database connection URL | `sqlite+aiosqlite:///./data/bot.db` |
 | `DEFAULT_LANG` | No | Default language (en/ar) | `en` |
-| `OPENAI_API_KEY` | No | OpenAI API key for AI responses | - |
+| `GEMINI_API_KEY` | No | Google Gemini API key for AI responses | - |
 
 ### Getting Your Telegram User ID
 
@@ -313,8 +313,8 @@ docker run -d --name admin-bot --env-file .env admin-bot
 - Ensure bot has admin rights in the group
 
 **AI responses not working:**
-- Verify `OPENAI_API_KEY` is set in `.env`
-- Check OpenAI API quota and billing
+- Verify `GEMINI_API_KEY` is set in `.env`
+- Check Google AI Studio quota and billing
 
 ## Contributing
 
@@ -343,7 +343,7 @@ For issues, questions, or suggestions:
 Built with:
 - [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot)
 - [SQLAlchemy](https://www.sqlalchemy.org/)
-- [OpenAI API](https://openai.com/)
+- [Google Gemini API](https://ai.google.dev/)
 
 ---
 

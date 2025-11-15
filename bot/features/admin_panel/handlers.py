@@ -689,8 +689,8 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             
             if parts[4] == "model" and len(parts) >= 6:
                 model = parts[5]
-                # Support both specific version and general model names
-                if model in ["gpt-5-mini-2025-08-07", "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"]:
+                # Allow a curated set of Gemini models
+                if model in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"]:
                     async with db.SessionLocal() as s:  # type: ignore
                         settings = await SettingsRepo(s).get(gid, "ai_response") or {}
                         settings["model"] = model
@@ -1586,13 +1586,13 @@ async def show_ai(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) 
     import os
     lang = _panel_lang(update, gid)
     
-    # Check if OpenAI API key is configured
-    api_key_configured = bool(os.getenv("OPENAI_API_KEY"))
+    # Check if Gemini API key is configured
+    api_key_configured = bool(os.getenv("GEMINI_API_KEY"))
     
     async with db.SessionLocal() as s:  # type: ignore
         settings = await SettingsRepo(s).get(gid, "ai_response") or {
             "enabled": False,
-            "model": "gpt-5-mini-2025-08-07",
+            "model": "gemini-1.5-flash",
             "max_tokens": 500,
             "temperature": 0.7,
             "reply_only": True,
@@ -1606,15 +1606,11 @@ async def show_ai(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) 
     
     status = "✅ " + t(lang, "panel.ai.status_enabled") if settings["enabled"] else "❌ " + t(lang, "panel.ai.status_disabled")
     text += f"{t(lang, 'panel.ai.status')}: {status}\n"
-    model_name = settings.get('model', 'gpt-5-mini-2025-08-07')
+    model_name = settings.get('model', 'gemini-1.5-flash')
     text += f"{t(lang, 'panel.ai.model')}: {model_name}\n"
     text += f"{t(lang, 'panel.ai.max_tokens')}: {settings.get('max_tokens', 500)}\n"
     
-    # GPT-5 models only support temperature=1.0
-    if "gpt-5" in model_name:
-        text += f"{t(lang, 'panel.ai.temperature')}: 1.0 (Fixed for GPT-5)\n"
-    else:
-        text += f"{t(lang, 'panel.ai.temperature')}: {settings.get('temperature', 0.7)}\n"
+    text += f"{t(lang, 'panel.ai.temperature')}: {settings.get('temperature', 0.7)}\n"
     
     reply_mode = t(lang, "panel.ai.reply_only_yes") if settings.get("reply_only", True) else t(lang, "panel.ai.reply_only_no")
     text += f"{t(lang, 'panel.ai.reply_mode')}: {reply_mode}\n"
@@ -1637,9 +1633,9 @@ async def show_ai(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) 
     
         # Model selection
         rows.append([
-            InlineKeyboardButton("GPT-5 Mini", callback_data=f"panel:group:{gid}:ai:model:gpt-5-mini-2025-08-07"),
-            InlineKeyboardButton("GPT-4o", callback_data=f"panel:group:{gid}:ai:model:gpt-4o"),
-            InlineKeyboardButton("GPT-4o Mini", callback_data=f"panel:group:{gid}:ai:model:gpt-4o-mini"),
+            InlineKeyboardButton("Gemini 1.5 Flash", callback_data=f"panel:group:{gid}:ai:model:gemini-1.5-flash"),
+            InlineKeyboardButton("Gemini 1.5 Pro", callback_data=f"panel:group:{gid}:ai:model:gemini-1.5-pro"),
+            InlineKeyboardButton("Gemini 1.0 Pro", callback_data=f"panel:group:{gid}:ai:model:gemini-1.0-pro"),
         ])
         
         # Reply mode toggle
@@ -1649,14 +1645,12 @@ async def show_ai(update: Update, context: ContextTypes.DEFAULT_TYPE, gid: int) 
             callback_data=f"panel:group:{gid}:ai:reply_mode"
         )])
         
-        # Temperature adjustment (not available for GPT-5 models)
-        current_model = settings.get("model", "gpt-5-mini-2025-08-07")
-        if "gpt-5" not in current_model:
-            rows.append([
-                InlineKeyboardButton("🧊 Focused", callback_data=f"panel:group:{gid}:ai:temp:0.3"),
-                InlineKeyboardButton("⚖️ Balanced", callback_data=f"panel:group:{gid}:ai:temp:0.7"),
-                InlineKeyboardButton("🎨 Creative", callback_data=f"panel:group:{gid}:ai:temp:1.0"),
-            ])
+        # Temperature adjustment presets
+        rows.append([
+            InlineKeyboardButton("🧊 Focused", callback_data=f"panel:group:{gid}:ai:temp:0.3"),
+            InlineKeyboardButton("⚖️ Balanced", callback_data=f"panel:group:{gid}:ai:temp:0.7"),
+            InlineKeyboardButton("🎨 Creative", callback_data=f"panel:group:{gid}:ai:temp:1.0"),
+        ])
     
     # Back button
     rows.append([InlineKeyboardButton(t(lang, "panel.back"), callback_data=f"panel:group:{gid}:tab:home")])
