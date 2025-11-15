@@ -480,7 +480,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # Add buttons for channel and panel
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         keyboard = [
-            [InlineKeyboardButton(t(lang, "bot.button.updates"), url="https://t.me/codei8")],
+            [InlineKeyboardButton(t(lang, "bot.button.updates"), url="https://t.me/tahikal")],
             [InlineKeyboardButton(t(lang, "bot.button.manage"), callback_data="panel:back")]
         ]
         markup = InlineKeyboardMarkup(keyboard)
@@ -507,7 +507,7 @@ async def help_(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         # Add buttons
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         keyboard = [
-            [InlineKeyboardButton(t(lang, "bot.button.updates"), url="https://t.me/codei8")],
+            [InlineKeyboardButton(t(lang, "bot.button.updates"), url="https://t.me/tahikal")],
             [InlineKeyboardButton(t(lang, "bot.button.manage"), callback_data="panel:back")]
         ]
         markup = InlineKeyboardMarkup(keyboard)
