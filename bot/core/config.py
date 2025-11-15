@@ -15,7 +15,8 @@ except ImportError:
     PYDANTIC_V2 = False
 
 # Load .env file explicitly
-env_path = Path(__file__).parent.parent.parent / ".env"
+ENV_FILE_NAME = ".env"
+env_path = Path(__file__).parent.parent.parent / ENV_FILE_NAME
 load_dotenv(env_path, override=True)
 
 if PYDANTIC_V2:
@@ -24,7 +25,7 @@ if PYDANTIC_V2:
         OWNER_IDS: List[int] = []
         DATABASE_URL: str = "sqlite+aiosqlite:///./data/bot.db"
         DEFAULT_LANG: str = "en"
-        OPENAI_API_KEY: str = ""  # Optional, for AI Assistant feature
+        GEMINI_API_KEY: str = ""  # Optional, for AI Assistant feature
 
         @field_validator("OWNER_IDS", mode="before")
         @classmethod
@@ -42,7 +43,7 @@ if PYDANTIC_V2:
             return []
 
         model_config = SettingsConfigDict(
-            env_file=".env",
+            env_file=ENV_FILE_NAME,
             env_file_encoding="utf-8",
             extra="ignore",
         )
@@ -52,7 +53,7 @@ else:
         OWNER_IDS: List[int] = []
         DATABASE_URL: str = "sqlite+aiosqlite:///./data/bot.db"
         DEFAULT_LANG: str = "en"
-        OPENAI_API_KEY: str = ""  # Optional, for AI Assistant feature
+        GEMINI_API_KEY: str = ""  # Optional, for AI Assistant feature
 
         @validator("OWNER_IDS", pre=True)
         @classmethod
@@ -70,7 +71,7 @@ else:
             return []
 
         class Config:
-            env_file = ".env"
+            env_file = ENV_FILE_NAME
             env_file_encoding = "utf-8"
             extra = "ignore"
 
@@ -81,5 +82,5 @@ settings = Settings(
     OWNER_IDS=os.getenv("OWNER_IDS", ""),
     DATABASE_URL=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/bot.db"),
     DEFAULT_LANG=os.getenv("DEFAULT_LANG", "en"),
-    OPENAI_API_KEY=os.getenv("OPENAI_API_KEY", "")
+    GEMINI_API_KEY=os.getenv("GEMINI_API_KEY", "")
 )
