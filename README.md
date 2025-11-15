@@ -71,10 +71,6 @@ A production-grade, extensible Telegram group management bot built with modern a
    ```
 
 4. **Configure environment variables**
-   ```bash
-   cp .env.example .env
-   ```
-
    Edit `.env` and set your configuration:
    ```env
    BOT_TOKEN=your_bot_token_from_botfather
@@ -83,6 +79,7 @@ A production-grade, extensible Telegram group management bot built with modern a
    DEFAULT_LANG=en
 
    # Optional: For AI features
+   # GEMINI_API_KEY=your-gemini-api-key
    # OPENAI_API_KEY=sk-your-openai-api-key
    ```
 
@@ -111,6 +108,7 @@ A production-grade, extensible Telegram group management bot built with modern a
 | `OWNER_IDS` | Yes | Comma-separated list of bot owner Telegram IDs | - |
 | `DATABASE_URL` | No | SQLAlchemy database connection URL | `sqlite+aiosqlite:///./data/bot.db` |
 | `DEFAULT_LANG` | No | Default language (en/ar) | `en` |
+| `GEMINI_API_KEY` | No | Google Gemini API key for AI responses | - |
 | `OPENAI_API_KEY` | No | OpenAI API key for AI responses | - |
 
 ### Getting Your Telegram User ID
@@ -182,7 +180,7 @@ admin-bot/
 │   │   └── ar.json        # Arabic translations
 │   └── main.py            # Application entry point
 ├── scripts/               # Utility scripts
-├── .env.example           # Environment template
+├── .env                   # Environment configuration (sample values)
 ├── .gitignore             # Git ignore rules
 ├── pyproject.toml         # Project metadata and dependencies
 └── README.md              # This file
@@ -313,8 +311,8 @@ docker run -d --name admin-bot --env-file .env admin-bot
 - Ensure bot has admin rights in the group
 
 **AI responses not working:**
-- Verify `OPENAI_API_KEY` is set in `.env`
-- Check OpenAI API quota and billing
+- Verify either `GEMINI_API_KEY` or `OPENAI_API_KEY` is set in `.env`
+- Check provider quota and billing
 
 ## Contributing
 

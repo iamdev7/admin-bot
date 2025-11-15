@@ -2,9 +2,8 @@
 
 import logging
 import os
-from typing import Optional, Union, List, Dict, Any
+from typing import Optional, Union, List, Dict, Any, Tuple
 import asyncio
-from functools import lru_cache
 import base64
 from io import BytesIO
 
@@ -14,6 +13,12 @@ from telegram.constants import ChatAction, ParseMode
 import openai
 import re
 from openai import AsyncOpenAI
+import google.generativeai as genai
+
+try:
+    from google.api_core.exceptions import GoogleAPIError
+except ImportError:  # pragma: no cover - defensive fallback
+    GoogleAPIError = Exception  # type: ignore
 
 from ...core.i18n import I18N, t
 from ...core.permissions import require_group_admin
@@ -22,6 +27,120 @@ from ...infra import db
 from ...infra.settings_repo import SettingsRepo
 
 log = logging.getLogger(__name__)
+
+DEFAULT_SYSTEM_PROMPT = (
+    "You are an expert software engineer responding in a Telegram group chat. "
+    "Write like you're messaging a colleague - direct, helpful, technically precise.\n\n"
+    "RESPONSE STYLE:\n"
+    "• Keep responses SHORT (200-400 words typical, 800 max for complex topics)\n"
+    "• Start with the answer/solution immediately\n"
+    "• Use the same language as the question (Arabic/English)\n"
+    "• Write like a Telegram message, not an article\n"
+    "• Be confident and authoritative - you're the expert\n\n"
+    "FORMATTING:\n"
+    "• **Bold** for key points or commands\n"
+    "• `code` for inline code\n"
+    "• ```language\\ncode``` for code blocks\n"
+    "• Use → for steps or consequences\n"
+    "• Keep paragraphs SHORT (2-3 sentences max)\n\n"
+    "RESPONSE STRUCTURE:\n"
+    "For questions → Direct answer first, then brief explanation if needed\n"
+    "For errors → Issue identified → Quick fix → Command/code\n"
+    "For code review → Main issue → Fixed version → Why it matters\n"
+    "For images → What I see → The problem → Solution\n"
+    "For how-to → Steps 1-2-3 with commands\n\n"
+    "EXAMPLES:\n"
+    "Q: 'Why is my API returning 404?'\n"
+    "A: 'Your endpoint path doesn't match. You have `/api/user` but calling `/api/users`.\n\n"
+    "Fix: `app.get('/api/users', ...)` or update your request.'\n\n"
+    "Q: 'How to center a div?'\n"
+    "A: 'Use flexbox:\n"
+    "```css\\n"
+    ".parent {\\n"
+    "  display: flex;\\n"
+    "  justify-content: center;\\n"
+    "  align-items: center;\\n"
+    "}\\n```'\n\n"
+    "IMPORTANT:\n"
+    "• NO fluff, greetings, or 'I hope this helps'\n"
+    "• NO over-explaining obvious things\n"
+    "• If uncertain, say 'Likely X, but check Y'\n"
+    "• For Arabic: Use professional technical Arabic\n"
+    "• Think Telegram message, not documentation"
+)
+
+
+def _resolve_system_prompt(settings: dict) -> str:
+    return settings.get("system_prompt") or DEFAULT_SYSTEM_PROMPT
+
+
+def _extract_text_from_content(content: Union[str, List[Dict[str, Any]], Dict[str, Any]]) -> str:
+    """Extract plain text from stored conversation content."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, dict):
+        if content.get("type") == "text":
+            return content.get("text", "")
+        return str(content)
+    if isinstance(content, list):
+        text_parts: List[str] = []
+        for part in content:
+            if isinstance(part, dict) and part.get("type") == "text":
+                text_parts.append(part.get("text", ""))
+        return " ".join(t for t in text_parts if t).strip()
+    return ""
+
+
+def _extract_gemini_text(response: Any) -> str:
+    """Extract text from Gemini responses in a defensive way."""
+    if not response:
+        return ""
+
+    text = getattr(response, "text", None)
+    if text:
+        return str(text).strip()
+
+    candidates = getattr(response, "candidates", None)
+    if not candidates:
+        return ""
+
+    for candidate in candidates:
+        candidate_text = getattr(candidate, "text", None)
+        if candidate_text:
+            return str(candidate_text).strip()
+
+        content = getattr(candidate, "content", None)
+        if content is not None:
+            parts = getattr(content, "parts", None)
+            if parts:
+                for part in parts:
+                    part_text = getattr(part, "text", None)
+                    if part_text:
+                        return str(part_text).strip()
+                    if isinstance(part, dict):
+                        text_value = part.get("text")
+                        if text_value:
+                            return str(text_value).strip()
+
+        if isinstance(candidate, dict):
+            candidate_content = candidate.get("content")
+            if isinstance(candidate_content, dict):
+                parts = candidate_content.get("parts") or []
+                for part in parts:
+                    if isinstance(part, dict):
+                        text_value = part.get("text")
+                        if text_value:
+                            return str(text_value).strip()
+
+    return ""
+
+
+# Initialize OpenAI client (will be configured on first use)
+_client: Optional[AsyncOpenAI] = None
+
+# Gemini configuration cache
+_gemini_configured: bool = False
+_gemini_models: dict[Tuple[str, str], genai.GenerativeModel] = {}
 
 async def notify_admin_ai_error(context, error_type: str, error_details: str, chat_id: int = None, user_id: int = None):
     """Send AI error notifications to bot admins."""
@@ -140,9 +259,6 @@ def format_markdown_v2(text: str) -> str:
     
     return text
 
-# Initialize OpenAI client (will be configured on first use)
-_client: Optional[AsyncOpenAI] = None
-
 def get_openai_client() -> AsyncOpenAI:
     """Get or create OpenAI client instance using latest API."""
     global _client
@@ -159,6 +275,28 @@ def get_openai_client() -> AsyncOpenAI:
         )
     return _client
 
+
+def get_gemini_model(model_name: str, system_prompt: str) -> genai.GenerativeModel:
+    """Get or create a configured Gemini model instance."""
+    global _gemini_configured, _gemini_models
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY not set in environment variables")
+
+    if not _gemini_configured:
+        genai.configure(api_key=api_key)
+        _gemini_configured = True
+
+    cache_key = (model_name, system_prompt)
+    if cache_key not in _gemini_models:
+        model_kwargs: Dict[str, Any] = {}
+        if system_prompt:
+            model_kwargs["system_instruction"] = system_prompt
+        _gemini_models[cache_key] = genai.GenerativeModel(model_name, **model_kwargs)
+
+    return _gemini_models[cache_key]
+
 async def is_ai_enabled(chat_id: int) -> bool:
     """Check if AI responses are enabled for this group."""
     async with db.SessionLocal() as s:  # type: ignore
@@ -170,9 +308,9 @@ async def get_ai_settings(chat_id: int) -> dict:
     async with db.SessionLocal() as s:  # type: ignore
         settings = await SettingsRepo(s).get(chat_id, "ai_response") or {
             "enabled": False,
-            "model": "gpt-5-mini-2025-08-07",  # Default model - GPT-5 Mini
-            "max_tokens": 800,  # Optimized for concise Telegram messages
-            "temperature": 1.0,  # GPT-5 requires 1.0
+            "model": "gemini-2.5-flash",  # Default model - Gemini 2.5 Flash
+            "max_tokens": 800,  # Used as max output tokens for Gemini / OpenAI fallback
+            "temperature": 0.7,
             "system_prompt": None,  # Custom system prompt if set
             "reply_only": True,  # Only respond to replies to bot messages
             "trigger_words": [],  # Optional trigger words to activate AI
@@ -286,185 +424,205 @@ async def download_and_encode_image(photo: PhotoSize, context: ContextTypes.DEFA
         return None
 
 async def generate_ai_response(
-    message_content: Union[str, Dict[str, Any]], 
-    context_messages: list, 
+    message_content: Union[str, Dict[str, Any]],
+    context_messages: list,
     settings: dict,
     image_data: Optional[str] = None,
     context: Optional[ContextTypes.DEFAULT_TYPE] = None,
     chat_id: Optional[int] = None,
     user_id: Optional[int] = None
 ) -> str:
-    """Generate AI response using OpenAI API with optional image analysis."""
-    try:
-        client = get_openai_client()
-        
-        # Build messages for the API
-        messages = []
-        
-        # Add system prompt
-        system_prompt = settings.get("system_prompt") or (
-            "You are an expert software engineer responding in a Telegram group chat. "
-            "Write like you're messaging a colleague - direct, helpful, technically precise.\n\n"
-            
-            "RESPONSE STYLE:\n"
-            "• Keep responses SHORT (200-400 words typical, 800 max for complex topics)\n"
-            "• Start with the answer/solution immediately\n" 
-            "• Use the same language as the question (Arabic/English)\n"
-            "• Write like a Telegram message, not an article\n"
-            "• Be confident and authoritative - you're the expert\n\n"
-            
-            "FORMATTING:\n"
-            "• **Bold** for key points or commands\n"
-            "• `code` for inline code\n"
-            "• ```language\\ncode``` for code blocks\n"
-            "• Use → for steps or consequences\n"
-            "• Keep paragraphs SHORT (2-3 sentences max)\n\n"
-            
-            "RESPONSE STRUCTURE:\n"
-            "For questions → Direct answer first, then brief explanation if needed\n"
-            "For errors → Issue identified → Quick fix → Command/code\n"
-            "For code review → Main issue → Fixed version → Why it matters\n"
-            "For images → What I see → The problem → Solution\n"
-            "For how-to → Steps 1-2-3 with commands\n\n"
-            
-            "EXAMPLES:\n"
-            "Q: 'Why is my API returning 404?'\n"
-            "A: 'Your endpoint path doesn't match. You have `/api/user` but calling `/api/users`.\n\n"
-            "Fix: `app.get('/api/users', ...)` or update your request.'\n\n"
-            
-            "Q: 'How to center a div?'\n"
-            "A: 'Use flexbox:\n"
-            "```css\\n"
-            ".parent {\\n"
-            "  display: flex;\\n"
-            "  justify-content: center;\\n"
-            "  align-items: center;\\n"
-            "}\\n```'\n\n"
-            
-            "IMPORTANT:\n"
-            "• NO fluff, greetings, or 'I hope this helps'\n"
-            "• NO over-explaining obvious things\n"
-            "• If uncertain, say 'Likely X, but check Y'\n"
-            "• For Arabic: Use professional technical Arabic\n"
-            "• Think Telegram message, not documentation"
-        )
-        messages.append({"role": "system", "content": system_prompt})
-        
-        # Add context messages (conversation history)
-        for ctx_msg in context_messages:
-            role = "assistant" if ctx_msg.get("is_bot") else "user"
-            content = ctx_msg.get("content")
-            if not content:
-                # Fallback to text field for backward compatibility
-                content = ctx_msg.get("text", "")
-            if content:  # Only add non-empty messages
-                # For now, only include text content in context to avoid API errors
-                # Images in context would require proper formatting
-                if isinstance(content, str):
-                    messages.append({"role": role, "content": content})
-                elif isinstance(content, list):
-                    # Extract text from multimodal content for context
-                    text_parts = []
-                    for part in content:
-                        if isinstance(part, dict) and part.get("type") == "text":
-                            text_parts.append(part.get("text", ""))
-                    combined_text = " ".join(text_parts).strip()
-                    if combined_text:
-                        messages.append({"role": role, "content": combined_text})
-        
-        # Build the current message content
-        if image_data:
-            # For messages with images, create multimodal content
-            user_content = []
-            
-            # Add text description if provided
-            if isinstance(message_content, str) and message_content:
-                user_content.append({
-                    "type": "text",
-                    "text": message_content
-                })
-            
-            # Add the image
-            user_content.append({
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/jpeg;base64,{image_data}"
-                }
-            })
-            
-            messages.append({"role": "user", "content": user_content})
-            pass  # Image with text
-        else:
-            # Text-only message
-            messages.append({"role": "user", "content": message_content})
-            pass  # Text only
-        
-        # Generate response using GPT-5 Mini
-        # Use max_completion_tokens for GPT-5 models, max_tokens for others
-        model_name = settings.get("model", "gpt-5-mini-2025-08-07")
-        completion_params = {
-            "model": model_name,
-            "messages": messages,
-        }
-        
-        # GPT-5 models have different parameter requirements
-        if "gpt-5" in model_name:
-            # GPT-5 only supports temperature=1.0 (default)
-            completion_params["temperature"] = 1.0
-            # GPT-5 uses max_completion_tokens instead of max_tokens
-            # This includes BOTH reasoning tokens AND output tokens
-            # Set higher to ensure we get actual output after reasoning
-            completion_params["max_completion_tokens"] = settings.get("max_tokens", 2000)
-            # Add reasoning_effort to control reasoning vs output balance
-            completion_params["reasoning_effort"] = "minimal"  # Use minimal reasoning for faster responses
-            # GPT-5 doesn't support presence_penalty or frequency_penalty
-        else:
-            # Other models support variable temperature and penalties
-            completion_params["temperature"] = settings.get("temperature", 0.7)
-            completion_params["max_tokens"] = settings.get("max_tokens", 500)
-            completion_params["presence_penalty"] = 0.1
-            completion_params["frequency_penalty"] = 0.1
-        
-        response = await client.chat.completions.create(**completion_params)
+    """Generate an AI response using the configured provider."""
 
-        content = (response.choices[0].message.content or "").strip()
-        
-        if content:
-            return content
-        else:
-            # Empty response from API
-            return "I received an empty response from the AI model. Please try again."
-        
+    model_name = settings.get("model", "gemini-2.5-flash")
+    system_prompt = _resolve_system_prompt(settings)
+
+    try:
+        if model_name.startswith("gemini"):
+            return await _generate_gemini_response(
+                message_content,
+                context_messages,
+                settings,
+                image_data,
+                system_prompt,
+            )
+
+        return await _generate_openai_response(
+            message_content,
+            context_messages,
+            settings,
+            image_data,
+            system_prompt,
+        )
+
+    except ValueError as e:
+        log.error(f"AI configuration error: {e}")
+        if context:
+            await notify_admin_ai_error(context, "Configuration Error", str(e)[:500], chat_id, user_id)
+        return "AI service is not configured correctly. Please ask an admin to check the API keys."
+
     except openai.APIError as e:
         log.error(f"OpenAI API error in AI response: {e}")
-        
-        # Notify admins of API errors
+
         if context:
             error_details = str(e)[:500]
-            if hasattr(e, 'response') and hasattr(e.response, 'status_code'):
+            if hasattr(e, "response") and hasattr(e.response, "status_code"):
                 error_details = f"Status: {e.response.status_code}\n{error_details}"
             await notify_admin_ai_error(context, "OpenAI API Error", error_details, chat_id, user_id)
-        
+
         if "model" in str(e).lower():
             return (
                 "Model unavailable. An admin can verify the configured model name "
                 "and availability in the AI settings, then try again."
             )
-        elif "rate" in str(e).lower():
+        if "rate" in str(e).lower():
             return "Rate limit reached. Please try again in a moment."
-        elif "token" in str(e).lower() or "context_length" in str(e).lower():
+        if "token" in str(e).lower() or "context_length" in str(e).lower():
             return "The message is too long. Please try with a shorter message."
-        else:
-            return "AI service temporarily unavailable. Please try again later."
-    
+        return "AI service temporarily unavailable. Please try again later."
+
+    except GoogleAPIError as e:
+        log.error(f"Gemini API error in AI response: {e}")
+        if context:
+            await notify_admin_ai_error(context, "Gemini API Error", str(e)[:500], chat_id, user_id)
+
+        message_lower = str(e).lower()
+        if "model" in message_lower:
+            return "Gemini model unavailable. Please verify the configured model name."
+        if "quota" in message_lower or "rate" in message_lower:
+            return "Gemini quota exceeded. Please try again later."
+        return "Gemini service temporarily unavailable. Please try again later."
+
     except Exception as e:
         log.error(f"Error generating AI response: {e}", exc_info=True)
-        
-        # Notify admins of unexpected errors
+
         if context:
             await notify_admin_ai_error(context, "Unexpected Error", str(e)[:500], chat_id, user_id)
-        
+
         return "An error occurred while generating the response. The admin has been notified."
+
+
+async def _generate_openai_response(
+    message_content: Union[str, Dict[str, Any]],
+    context_messages: list,
+    settings: dict,
+    image_data: Optional[str],
+    system_prompt: str,
+) -> str:
+    client = get_openai_client()
+
+    messages: List[Dict[str, Any]] = []
+    messages.append({"role": "system", "content": system_prompt})
+
+    for ctx_msg in context_messages:
+        role = "assistant" if ctx_msg.get("is_bot") else "user"
+        content = ctx_msg.get("content") or ctx_msg.get("text")
+        text_content = _extract_text_from_content(content) if content else ""
+        if text_content:
+            messages.append({"role": role, "content": text_content})
+
+    if image_data:
+        user_content: List[Dict[str, Any]] = []
+        if isinstance(message_content, str) and message_content:
+            user_content.append({"type": "text", "text": message_content})
+        else:
+            normalized = _extract_text_from_content(message_content) if message_content else ""
+            if normalized:
+                user_content.append({"type": "text", "text": normalized})
+        user_content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/jpeg;base64,{image_data}"},
+        })
+        messages.append({"role": "user", "content": user_content})
+    else:
+        if isinstance(message_content, str):
+            user_payload = message_content
+        else:
+            user_payload = _extract_text_from_content(message_content) or str(message_content)
+        messages.append({"role": "user", "content": user_payload})
+
+    model_name = settings.get("model", "gpt-4o-mini")
+    completion_params: Dict[str, Any] = {
+        "model": model_name,
+        "messages": messages,
+    }
+
+    if "gpt-5" in model_name:
+        completion_params["temperature"] = 1.0
+        completion_params["max_completion_tokens"] = settings.get("max_tokens", 2000)
+        completion_params["reasoning_effort"] = "minimal"
+    else:
+        completion_params["temperature"] = settings.get("temperature", 0.7)
+        completion_params["max_tokens"] = settings.get("max_tokens", 500)
+        completion_params["presence_penalty"] = 0.1
+        completion_params["frequency_penalty"] = 0.1
+
+    response = await client.chat.completions.create(**completion_params)
+    content = (response.choices[0].message.content or "").strip()
+
+    if content:
+        return content
+    return "I received an empty response from the AI model. Please try again."
+
+
+async def _generate_gemini_response(
+    message_content: Union[str, Dict[str, Any]],
+    context_messages: list,
+    settings: dict,
+    image_data: Optional[str],
+    system_prompt: str,
+) -> str:
+    model_name = settings.get("model", "gemini-2.5-flash")
+    model = get_gemini_model(model_name, system_prompt)
+
+    history: List[Dict[str, Any]] = []
+    for ctx_msg in context_messages:
+        content = ctx_msg.get("content") or ctx_msg.get("text")
+        text_content = _extract_text_from_content(content) if content else ""
+        if not text_content:
+            continue
+        role = "model" if ctx_msg.get("is_bot") else "user"
+        history.append({"role": role, "parts": [{"text": text_content}]})
+
+    chat = model.start_chat(history=history)
+
+    if isinstance(message_content, str):
+        user_text = message_content
+    else:
+        user_text = _extract_text_from_content(message_content)
+
+    payload: Union[str, List[Dict[str, Any]]] = user_text or "Please respond to the latest user request."
+    if image_data:
+        try:
+            image_part = {
+                "mime_type": "image/jpeg",
+                "data": base64.b64decode(image_data),
+            }
+            payload = [image_part]
+            if user_text:
+                payload.append(user_text)
+        except Exception as decode_error:
+            log.warning(f"Failed to decode image for Gemini: {decode_error}")
+            if not user_text:
+                payload = "Please describe the provided image."
+
+    generation_config = {
+        "temperature": settings.get("temperature", 0.7),
+        "max_output_tokens": settings.get("max_tokens", 800),
+    }
+
+    response = await asyncio.to_thread(
+        chat.send_message,
+        payload,
+        generation_config=generation_config,
+    )
+    text_response = _extract_gemini_text(response)
+
+    if text_response:
+        return text_response
+
+    return "I received an empty response from the Gemini model. Please try again."
+
 
 async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle messages and generate AI responses when appropriate."""

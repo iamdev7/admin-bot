@@ -25,6 +25,7 @@ if PYDANTIC_V2:
         DATABASE_URL: str = "sqlite+aiosqlite:///./data/bot.db"
         DEFAULT_LANG: str = "en"
         OPENAI_API_KEY: str = ""  # Optional, for AI Assistant feature
+        GEMINI_API_KEY: str = ""  # Optional, for AI Assistant feature
 
         @field_validator("OWNER_IDS", mode="before")
         @classmethod
@@ -53,6 +54,7 @@ else:
         DATABASE_URL: str = "sqlite+aiosqlite:///./data/bot.db"
         DEFAULT_LANG: str = "en"
         OPENAI_API_KEY: str = ""  # Optional, for AI Assistant feature
+        GEMINI_API_KEY: str = ""  # Optional, for AI Assistant feature
 
         @validator("OWNER_IDS", pre=True)
         @classmethod
@@ -81,5 +83,6 @@ settings = Settings(
     OWNER_IDS=os.getenv("OWNER_IDS", ""),
     DATABASE_URL=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/bot.db"),
     DEFAULT_LANG=os.getenv("DEFAULT_LANG", "en"),
-    OPENAI_API_KEY=os.getenv("OPENAI_API_KEY", "")
+    OPENAI_API_KEY=os.getenv("OPENAI_API_KEY", ""),
+    GEMINI_API_KEY=os.getenv("GEMINI_API_KEY", ""),
 )
