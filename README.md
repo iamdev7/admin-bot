@@ -336,7 +336,7 @@ This project is provided as-is for educational and personal use.
 
 For issues, questions, or suggestions:
 - Open an issue on GitHub
-- Contact: [@codei8](https://t.me/codei8)
+- Contact: [@rnp_e](https://t.me/rnp_e)
 
 ## Acknowledgments
 
@@ -347,5 +347,5 @@ Built with:
 
 ---
 
-**Developer**: altmemy
-**Updates Channel**: [@codei8](https://t.me/codei8)
+**Developer**: Abdullah Alshareef ([@rnp_e](https://t.me/rnp_e))
+**Updates Channel**: [@tahikal](https://t.me/tahikal)

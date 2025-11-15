@@ -159,7 +159,7 @@ async def handle_private_message(update: Update, context: ContextTypes.DEFAULT_T
     text = t(lang, "start.private.welcome", bot_name=bot_name)
     
     keyboard = [
-        [InlineKeyboardButton(t(lang, "bot.button.updates"), url="https://t.me/codei8")],
+        [InlineKeyboardButton(t(lang, "bot.button.updates"), url="https://t.me/tahikal")],
         [InlineKeyboardButton(t(lang, "bot.button.manage"), callback_data="panel:back")]
     ]
     markup = InlineKeyboardMarkup(keyboard)
@@ -181,7 +181,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         text = await generate_help_text(update, context, lang)
         
         keyboard = [
-            [InlineKeyboardButton(t(lang, "bot.button.updates"), url="https://t.me/codei8")],
+            [InlineKeyboardButton(t(lang, "bot.button.updates"), url="https://t.me/tahikal")],
             [InlineKeyboardButton(t(lang, "bot.button.manage"), callback_data="panel:back")]
         ]
         markup = InlineKeyboardMarkup(keyboard)
